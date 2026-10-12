@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { GenderSelect } from "@/components/kucing/gender-select";
+import { DeleteCatButton } from "@/components/kucing/delete-cat-button";
 import { getMockCat } from "@/lib/mock";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -168,7 +169,7 @@ export default async function EditKucingPage({ params }: EditKucingPageProps) {
               />
             </div>
 
-            {/* Actions */}
+                        {/* Actions */}
             <div className="flex flex-col gap-3 pt-4">
               <Button
                 type="submit"
@@ -185,6 +186,7 @@ export default async function EditKucingPage({ params }: EditKucingPageProps) {
                   Batal
                 </Button>
               </Link>
+              <DeleteCatButton catId={cat.id} catName={cat.name} />
             </div>
           </form>
         </CardContent>

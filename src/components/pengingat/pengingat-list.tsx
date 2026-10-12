@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { daysUntil, formatDateID, getCatName, mockReminders } from "@/lib/mock";
 
 const FILTERS = [
@@ -30,6 +31,7 @@ export function PengingatList() {
   const [doneIds, setDoneIds] = useState<Set<string>>(
     () => new Set(mockReminders.filter((r) => r.doneAt).map((r) => r.id))
   );
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const items = useMemo(() => {
     const withDone = mockReminders.map((r) => ({
@@ -48,6 +50,15 @@ export function PengingatList() {
       else next.add(id);
       return next;
     });
+  }
+
+  function handleDelete(id: string) {
+    setDoneIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setDeleting(null);
   }
 
   function subtitle(dueDate: string): string {
@@ -132,23 +143,56 @@ export function PengingatList() {
                     </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleDone(r.id)}
-                  aria-label={r.isDone ? "Tandai belum selesai" : "Tandai selesai"}
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${
-                    r.isDone
-                      ? "bg-mint-subtle text-secondary"
-                      : "bg-surface-container text-on-surface-variant"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-lg">
-                    {r.isDone ? "check_circle" : "done"}
-                  </span>
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setDeleting(r.id)}
+                    aria-label="Hapus"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-error-container hover:text-error active:scale-90"
+                  >
+                    <span className="material-symbols-outlined text-lg">delete</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleDone(r.id)}
+                    aria-label={r.isDone ? "Tandai belum selesai" : "Tandai selesai"}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${
+                      r.isDone
+                        ? "bg-mint-subtle text-secondary"
+                        : "bg-surface-container text-on-surface-variant"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      {r.isDone ? "check_circle" : "done"}
+                    </span>
+                  </button>
+                </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-inverse-surface/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-surface-card p-6 shadow-2xl">
+            <h3 className="font-bold text-on-surface">Hapus Pengingat?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Pengingat ini akan dihapus permanen.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setDeleting(null)} className="h-12 flex-1 rounded-full">
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleDelete(deleting)}
+                className="h-12 flex-1 rounded-full bg-error text-white hover:bg-error/90"
+              >
+                Hapus
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

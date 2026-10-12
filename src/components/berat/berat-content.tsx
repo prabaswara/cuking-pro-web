@@ -10,11 +10,17 @@ import { formatDateID, getCatName, mockWeights } from "@/lib/mock";
 export function BeratContent({ catId }: { catId: string }) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [editKg, setEditKg] = useState("");
+  const [editNote, setEditNote] = useState("");
   const catName = getCatName(catId);
 
-  const weights = mockWeights
-    .filter((w) => w.catId === catId)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const [weights, setWeights] = useState(() =>
+    mockWeights
+      .filter((w) => w.catId === catId)
+      .sort((a, b) => b.date.localeCompare(a.date))
+  );
   const latest = weights[0];
 
   return (
@@ -97,22 +103,44 @@ export function BeratContent({ catId }: { catId: string }) {
                     </p>
                   </div>
                 </div>
-                {diff != null ? (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      diff >= 0
-                        ? "bg-mint-subtle text-secondary"
-                        : "bg-amber-subtle text-honey-amber"
-                    }`}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(w.id);
+                      setEditKg(w.kg.toString());
+                      setEditNote(w.note ?? "");
+                    }}
+                    aria-label="Edit"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-on-surface"
                   >
-                    {diff >= 0 ? "+" : ""}
-                    {(diff * 1000).toFixed(0)}g
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs text-text-muted">
-                    Baseline
-                  </span>
-                )}
+                    <span className="material-symbols-outlined text-lg">edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleting(w.id)}
+                    aria-label="Hapus"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-error-container hover:text-error"
+                  >
+                    <span className="material-symbols-outlined text-lg">delete</span>
+                  </button>
+                  {diff != null ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        diff >= 0
+                          ? "bg-mint-subtle text-secondary"
+                          : "bg-amber-subtle text-honey-amber"
+                      }`}
+                    >
+                      {diff >= 0 ? "+" : ""}
+                      {(diff * 1000).toFixed(0)}g
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs text-text-muted">
+                      Baseline
+                    </span>
+                  )}
+                </div>
               </div>
               {w.note && (
                 <p className="mt-2 rounded-2xl bg-surface-container-low px-3 py-1.5 text-sm text-on-surface-variant">
@@ -202,6 +230,89 @@ export function BeratContent({ catId }: { catId: string }) {
             </div>
           </div>
         </>
+      )}
+
+      {/* Modal edit berat */}
+      {editing && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-inverse-surface/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-surface-card p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-on-surface">Edit Berat Badan</h3>
+              <button onClick={() => setEditing(null)} className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-text-muted">
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit-kg">Berat (kg)</Label>
+                <Input
+                  id="edit-kg"
+                  type="number"
+                  step="0.05"
+                  min="0.1"
+                  max="20"
+                  value={editKg}
+                  onChange={(e) => setEditKg(e.target.value)}
+                  className="h-12 rounded-2xl border-sand-border"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-note">Catatan</Label>
+                <Input
+                  id="edit-note"
+                  type="text"
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  placeholder="cth: stabil, aktif"
+                  className="h-12 rounded-2xl border-sand-border"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditing(null)} className="h-12 flex-1 rounded-full">Batal</Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const kg = parseFloat(editKg);
+                    if (kg > 0 && kg <= 20) {
+                      setWeights((prev) =>
+                        prev.map((w) => (w.id === editing ? { ...w, kg, note: editNote.trim() || undefined } : w))
+                      );
+                      setEditing(null);
+                    }
+                  }}
+                  className="h-12 flex-1 rounded-full"
+                >
+                  Simpan
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog hapus berat */}
+      {deleting && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-inverse-surface/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-surface-card p-6 shadow-2xl">
+            <h3 className="font-bold text-on-surface">Hapus Catatan Berat?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Catatan timbang badan ini akan dihapus permanen.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setDeleting(null)} className="h-12 flex-1 rounded-full">Batal</Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setWeights((prev) => prev.filter((w) => w.id !== deleting));
+                  setDeleting(null);
+                }}
+                className="h-12 flex-1 rounded-full bg-error text-white hover:bg-error/90"
+              >
+                Hapus
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

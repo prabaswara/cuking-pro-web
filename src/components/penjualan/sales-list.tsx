@@ -24,9 +24,14 @@ interface SalesListProps {
 export function SalesList({ userId }: SalesListProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<"semua" | "listed" | "reserved" | "sold" | "cancelled">("semua");
-  const sales = getCatSalesForUser(userId);
+  const [sales, setSales] = useState(() => getCatSalesForUser(userId));
+  const [deleting, setDeleting] = useState<CatSale | null>(null);
 
   const visible = sales.filter((s) => (filter === "semua" ? true : s.status === filter));
+
+  function updateStatus(id: string, status: CatSale["status"]) {
+    setSales((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+  }
 
   return (
     <div className="space-y-4">
@@ -76,18 +81,45 @@ export function SalesList({ userId }: SalesListProps) {
       ) : (
         <div className="space-y-3">
           {visible.map((sale) => (
-            <SaleCard key={sale.id} sale={sale} />
+            <SaleCard key={sale.id} sale={sale} onUpdateStatus={updateStatus} onDelete={setDeleting} />
           ))}
         </div>
       )}
 
       {/* Modal catat penjualan */}
       {open && <SaleForm onClose={() => setOpen(false)} />}
+
+      {deleting && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-inverse-surface/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-surface-card p-6 shadow-2xl">
+            <h3 className="font-bold text-on-surface">Hapus Penjualan?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Penjualan &ldquo;{deleting.catName}&rdquo; akan dihapus permanen.
+              {deleting.status === "sold" && " Kucing akan kembali berstatus aktif."}
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setDeleting(null)} className="h-12 flex-1 rounded-full">
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setSales((prev) => prev.filter((s) => s.id !== deleting.id));
+                  setDeleting(null);
+                }}
+                className="h-12 flex-1 rounded-full bg-error text-white hover:bg-error/90"
+              >
+                Hapus
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function SaleCard({ sale }: { sale: CatSale }) {
+function SaleCard({ sale, onUpdateStatus, onDelete }: { sale: CatSale; onUpdateStatus: (id: string, status: CatSale["status"]) => void; onDelete: (sale: CatSale) => void }) {
   const style = STATUS_STYLE[sale.status];
   const isActive = sale.status === "listed" || sale.status === "reserved";
 
@@ -130,7 +162,9 @@ function SaleCard({ sale }: { sale: CatSale }) {
               <Link href={`/penjualan/${sale.id}/edit`}>
                 <Button size="sm" variant="outline" className="h-8 rounded-full">Ubah ke Dipesan</Button>
               </Link>
-              <Button size="sm" variant="outline" className="h-8 rounded-full">Batal</Button>
+              <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={() => onUpdateStatus(sale.id, "cancelled")}>
+                Batal
+              </Button>
             </>
           )}
           {sale.status === "reserved" && (
@@ -138,14 +172,25 @@ function SaleCard({ sale }: { sale: CatSale }) {
               <Link href={`/penjualan/${sale.id}/edit`}>
                 <Button size="sm" className="h-8 rounded-full">Tandai Terjual</Button>
               </Link>
-              <Button size="sm" variant="outline" className="h-8 rounded-full">Batal Pesanan</Button>
+              <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={() => onUpdateStatus(sale.id, "cancelled")}>
+                Batal Pesanan
+              </Button>
             </>
           )}
           {sale.status === "cancelled" && (
-            <Button size="sm" variant="outline" className="h-8 rounded-full">Aktifkan Kembali</Button>
+            <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={() => onUpdateStatus(sale.id, "listed")}>
+              Aktifkan Kembali
+            </Button>
           )}
           {sale.status === "sold" && (
-            <Button size="sm" variant="outline" className="h-8 rounded-full">Transfer ke Pembeli</Button>
+            <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={() => alert("Fitur transfer akan hadir di Fase 5. Pembeli dengan akun cukingPro akan menerima notifikasi transfer.")}>
+              Transfer ke Pembeli
+            </Button>
+          )}
+          {sale.status !== "sold" && (
+            <Button size="sm" variant="outline" className="h-8 rounded-full" onClick={() => onDelete(sale)}>
+              Hapus
+            </Button>
           )}
         </div>
 

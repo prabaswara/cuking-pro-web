@@ -37,7 +37,7 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
             Kembali ke Kucing Saya
           </Link>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link href={`/kucing/${cat.id}/edit`}>
             <Button variant="outline" size="sm" className="rounded-full">
               Edit Profil
@@ -51,6 +51,14 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
               Silsilah
             </Button>
           </Link>
+          {cat.status === "active" && cat.trackingStatus === "tracked" && (
+            <Link href={`/transfer`}>
+              <Button variant="outline" size="sm" className="rounded-full">
+                <span className="material-symbols-outlined mr-1 text-lg">swap_horiz</span>
+                Transfer
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -148,14 +156,14 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
         >
           Silsilah
         </Link>
-        <span
-          title="Fase berikutnya"
-          className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted/50"
+        <Link
+          href="/breeding"
+          className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted shadow-sm transition-all hover:text-on-surface active:scale-95"
         >
           Breeding
-        </span>
+        </Link>
         <span
-          title="Fase berikutnya"
+          title="Segera hadir"
           className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted/50"
         >
           Dokumen

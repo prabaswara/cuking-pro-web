@@ -1,6 +1,25 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { UpgradeButton } from "@/components/paket/upgrade-button";
+import { formatDateID, formatRupiah } from "@/lib/mock";
+
+const mockPayments = [
+  {
+    id: "pay-demo-1",
+    order_id: "CKP-2026-001",
+    amount: 99000,
+    status: "pending",
+    created_at: new Date(Date.now() - 86400000),
+  },
+  {
+    id: "pay-demo-2",
+    order_id: "CKP-2025-042",
+    amount: 99000,
+    status: "settlement",
+    created_at: new Date(Date.now() - 794880000),
+  },
+];
 
 export default function PaketPage() {
   return (
@@ -176,12 +195,52 @@ export default function PaketPage() {
               </li>
             </ul>
 
-            <Button className="w-full rounded-full">
-              Upgrade ke Pro
-            </Button>
+            <UpgradeButton />
           </CardContent>
         </Card>
       </div>
+
+      {/* Riwayat Pembayaran */}
+      <Card className="rounded-3xl border-sand-border shadow-warm-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Riwayat Pembayaran</CardTitle>
+          <CardDescription>Transaksi langganan kamu</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {mockPayments.length === 0 ? (
+            <div className="rounded-2xl bg-surface-container-low p-6 text-center">
+              <p className="font-semibold text-on-surface">Belum ada pembayaran</p>
+              <p className="mt-1 text-sm text-text-muted">Riwayat pembayaran Pro akan muncul di sini.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {mockPayments.map((pay) => (
+                <div key={pay.id} className="flex items-center justify-between gap-3 rounded-2xl border border-sand-border bg-surface-card p-3.5">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-on-surface">{pay.order_id}</p>
+                    <p className="text-sm text-text-muted">{formatDateID(pay.created_at.toISOString())}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-on-surface">{formatRupiah(pay.amount)}</span>
+                    <Badge
+                      variant="outline"
+                      className={
+                        pay.status === "settlement"
+                          ? "bg-mint-subtle text-secondary"
+                          : pay.status === "pending"
+                            ? "bg-amber-subtle text-honey-amber"
+                            : "bg-surface-container text-on-surface-variant"
+                      }
+                    >
+                      {pay.status === "settlement" ? "Berhasil" : pay.status === "pending" ? "Pending" : pay.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* FAQ */}
       <Card className="rounded-3xl border-sand-border shadow-warm-sm">

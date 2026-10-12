@@ -16,8 +16,8 @@ export function Header() {
         {/* Right Section */}
         <div className="flex items-center gap-3">
           {/* Notifications */}
-          <button
-            type="button"
+          <Link
+            href="/notifikasi"
             className="relative flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
             aria-label="Notifikasi"
           >
@@ -25,7 +25,7 @@ export function Header() {
               notifications
             </span>
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary ring-2 ring-peach-canvas" />
-          </button>
+          </Link>
 
           {/* Profile */}
           <Link href="/profil">

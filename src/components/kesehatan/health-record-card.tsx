@@ -13,9 +13,11 @@ const TYPE_STYLE: Record<HealthRecord["type"], { bg: string; text: string; icon:
 
 interface HealthRecordCardProps {
   record: HealthRecord;
+  onEdit?: (record: HealthRecord) => void;
+  onDelete?: (record: HealthRecord) => void;
 }
 
-export function HealthRecordCard({ record }: HealthRecordCardProps) {
+export function HealthRecordCard({ record, onEdit, onDelete }: HealthRecordCardProps) {
   const style = TYPE_STYLE[record.type];
 
   return (
@@ -39,11 +41,33 @@ export function HealthRecordCard({ record }: HealthRecordCardProps) {
             </p>
           </div>
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${style.bg} ${style.text}`}
-        >
-          {healthTypeLabel(record.type)}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(record)}
+              aria-label="Edit"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-on-surface"
+            >
+              <span className="material-symbols-outlined text-lg">edit</span>
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(record)}
+              aria-label="Hapus"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-error-container hover:text-error"
+            >
+              <span className="material-symbols-outlined text-lg">delete</span>
+            </button>
+          )}
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${style.bg} ${style.text}`}
+          >
+            {healthTypeLabel(record.type)}
+          </span>
+        </div>
       </div>
 
       {(record.nextDueDate || record.cost != null || record.notes) && (

@@ -428,3 +428,190 @@ export function getQueenDisplayName(m: Mating): string {
 export function getSireDisplayName(m: Mating): string {
   return m.sireId ? getCatName(m.sireId) : m.sireNameManual ?? "Pejantan luar";
 }
+
+// ========================================
+// MOCK FASE 4 — Jasa Pacak
+// ========================================
+
+import type { StudService, StudBooking, Transaction, CatTransfer, OwnershipHistory } from "@/types";
+
+export const mockStudServices: StudService[] = [
+  {
+    id: "ss-simba",
+    catId: "cat-simba",
+    catName: "Simba",
+    ownerId: "user-1",
+    feeAmount: 3000000,
+    feeDescription: null,
+    notes: "Maine Coon, pedigree ICA-2023-MCO-1102. Pengalaman 5x kawin.",
+    isAvailable: true,
+  },
+  {
+    id: "ss-luna-stud",
+    catId: null,
+    catName: "Custom Stud",
+    ownerId: "user-1",
+    feeAmount: null,
+    feeDescription: "Anak pilihan pertama",
+    notes: null,
+    isAvailable: false,
+  },
+];
+
+// Stud bookings (kawin pacak)
+export interface StudMating {
+  id: string;
+  bookingId: string;
+  matingDate: string;
+  notes?: string | null;
+}
+
+export const mockStudMatings: StudMating[] = [
+  { id: "sm-1", bookingId: "sb-1", matingDate: d(-30), notes: "Kawin pertama" },
+  { id: "sm-2", bookingId: "sb-1", matingDate: d(-28), notes: "Kawin kedua" },
+];
+
+export const mockStudBookings: StudBooking[] = [
+  {
+    id: "sb-1",
+    ownerId: "user-1",
+    studServiceId: "ss-simba",
+    clientName: "Dian Pratama",
+    clientWhatsapp: "081298765432",
+    queenName: "Bella",
+    queenBreed: "Persia",
+    queenAgeText: "1,5 tahun",
+    plannedDate: d(-30),
+    status: "ongoing",
+    feeAgreed: 3000000,
+    depositAmount: 500000,
+    depositPaid: true,
+    expectedDueDate: d(35), // -30 + 65
+    expectedDueDateManual: false,
+    queenPregnancyStatus: "pregnant",
+    notes: "Betina datang dengan buku vaksin lengkap.",
+    createdAt: new Date(d(-35)),
+  },
+  {
+    id: "sb-2",
+    ownerId: "user-1",
+    studServiceId: "ss-simba",
+    clientName: "Sari Wulandari",
+    clientWhatsapp: "08135554443",
+    queenName: "Ciwi",
+    queenBreed: "British Shorthair",
+    queenAgeText: "2 tahun",
+    plannedDate: d(7),
+    status: "approved",
+    feeAgreed: 3000000,
+    depositAmount: 500000,
+    depositPaid: false,
+    expectedDueDate: null,
+    expectedDueDateManual: false,
+    queenPregnancyStatus: "unknown",
+    notes: "Ingin anak rajah. DP dibayar saat jemput.",
+    createdAt: new Date(d(-3)),
+  },
+  {
+    id: "sb-3",
+    ownerId: "user-1",
+    studServiceId: "ss-simba",
+    clientName: "Andi Kurniawan",
+    clientWhatsapp: "08571112223",
+    queenName: "Molly",
+    queenBreed: "Domestik",
+    queenAgeText: null,
+    plannedDate: null,
+    status: "requested",
+    feeAgreed: null,
+    depositAmount: null,
+    depositPaid: false,
+    expectedDueDate: null,
+    expectedDueDateManual: false,
+    queenPregnancyStatus: "unknown",
+    notes: "Belum tentu tanggal, menunggu kesiapan betina.",
+    createdAt: new Date(d(-1)),
+  },
+];
+
+// Helper Fase 4
+export function getStudServicesForUser(userId: string): StudService[] {
+  return mockStudServices.filter((s) => s.ownerId === userId);
+}
+export function getStudBookingsForUser(userId: string): StudBooking[] {
+  return mockStudBookings
+    .filter((b) => b.ownerId === userId)
+    .sort((a, b) => (a.plannedDate ?? "9999").localeCompare(b.plannedDate ?? "9999"));
+}
+export function getStudBooking(id: string): StudBooking | undefined {
+  return mockStudBookings.find((b) => b.id === id);
+}
+export function getStudService(id: string): StudService | undefined {
+  return mockStudServices.find((s) => s.id === id);
+}
+export function getStudMatingsForBooking(bookingId: string): StudMating[] {
+  return mockStudMatings
+    .filter((m) => m.bookingId === bookingId)
+    .sort((a, b) => a.matingDate.localeCompare(b.matingDate));
+}
+
+// ========================================
+// MOCK FASE 5 — Transfer & Keuangan
+// ========================================
+
+export const mockTransactions: Transaction[] = [
+  { id: "tx-1", userId: "user-1", type: "income", category: "penjualan kucing", amount: 5500000, txnDate: d(-40), catName: "Anak Mochi #1", saleId: "sale-1", notes: "Jual anak pertama" },
+  { id: "tx-2", userId: "user-1", type: "income", category: "jasa pacak", amount: 3000000, txnDate: d(-30), catName: "Simba (pacak)", bookingId: "sb-1", notes: "DP + pelunasan booking Dian" },
+  { id: "tx-3", userId: "user-1", type: "expense", category: "pakan", amount: 850000, txnDate: d(-25), catName: "Mochi", notes: "Royal Canin Kitten 15kg" },
+  { id: "tx-4", userId: "user-1", type: "expense", category: "dokter", amount: 250000, txnDate: d(-20), catName: "Luna", notes: "USG gestasi" },
+  { id: "tx-5", userId: "user-1", type: "expense", category: "perlengkapan", amount: 420000, txnDate: d(-10), notes: "Pasir & litter box baru" },
+  { id: "tx-6", userId: "user-1", type: "income", category: "penjualan kucing", amount: 5000000, txnDate: d(-5), catName: "Anak Mochi #2", saleId: "sale-2", notes: "Harga akhir setelah negosiasi" },
+];
+
+export const mockCatTransfers: CatTransfer[] = [
+  {
+    id: "ct-1",
+    catId: "cat-mochi",
+    catName: "Mochi",
+    catSummary: "British Shorthair • Lilac Solid • 2 thn 4 bln",
+    fromUserId: "user-1",
+    toEmail: "dian@example.com",
+    toUserId: null,
+    message: "Sudah vaksin lengkap, buku registrasi diserahkan.",
+    status: "pending",
+    createdAt: new Date(d(-2)),
+    expiresAt: new Date(d(12)),
+    respondedAt: null,
+  },
+  {
+    id: "ct-2",
+    catId: "cat-luna",
+    catName: "Luna",
+    catSummary: "Persia • Putih Solid • 1 thn 3 bln",
+    fromUserId: "user-2",
+    toEmail: "user@example.com",
+    toUserId: "user-1",
+    message: "Luna sudah hamil, perlu perhatian ekstra.",
+    status: "accepted",
+    createdAt: new Date(d(-100)),
+    expiresAt: new Date(d(-86)),
+    respondedAt: new Date(d(-98)),
+  },
+];
+
+export const mockOwnershipHistory: OwnershipHistory[] = [
+  { id: "oh-1", catId: "cat-mochi", catName: "Mochi", ownerId: "user-1", ownerDisplayName: "Pengguna", startedAt: new Date("2024-06-14"), endedAt: null, acquiredVia: "created" },
+  { id: "oh-2", catId: "cat-luna", catName: "Luna", ownerId: "user-2", ownerDisplayName: "Budi Santoso", startedAt: new Date("2025-07-01"), endedAt: new Date(d(-98)), acquiredVia: "created" },
+  { id: "oh-3", catId: "cat-luna", catName: "Luna", ownerId: "user-1", ownerDisplayName: "Pengguna", startedAt: new Date(d(-98)), endedAt: null, acquiredVia: "transfer", transferId: "ct-2" },
+];
+
+// Helper Fase 5
+export function getTransactionsForUser(userId: string): Transaction[] {
+  return mockTransactions.filter((t) => t.userId === userId);
+}
+export function getTransfersForUser(userId: string): CatTransfer[] {
+  return mockCatTransfers.filter((t) => t.fromUserId === userId || t.toUserId === userId);
+}
+export function getOwnershipHistory(catId: string): OwnershipHistory[] {
+  return mockOwnershipHistory.filter((o) => o.catId === catId);
+}
