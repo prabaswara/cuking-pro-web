@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { LogoutButton } from "@/components/profil/logout-button";
 
 export default function PengaturanPage() {
   return (
@@ -103,15 +104,7 @@ export default function PengaturanPage() {
             </p>
           </button>
 
-          <button
-            type="button"
-            className="w-full rounded-2xl bg-error-container/50 p-4 text-left transition-colors hover:bg-error-container"
-          >
-            <p className="font-semibold text-error">Keluar</p>
-            <p className="text-sm text-text-muted">
-              Akhiri sesi dan kembali ke halaman login
-            </p>
-          </button>
+          <LogoutButton />
         </CardContent>
       </Card>
 

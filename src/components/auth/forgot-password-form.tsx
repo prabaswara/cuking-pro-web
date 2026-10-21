@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
 
 export function ForgotPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,19 +20,12 @@ export function ForgotPasswordForm() {
     setError(null);
 
     try {
-      // TODO: Implement actual forgot password with Better Auth
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+      // Selalu tampilkan status "terkirim" agar tidak membocorkan
+      // apakah sebuah email terdaftar atau tidak.
+      await authClient.requestPasswordReset({
+        email,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error?.message || "Gagal mengirim email");
-        return;
-      }
 
       setIsSubmitted(true);
     } catch {

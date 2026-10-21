@@ -1,15 +1,17 @@
 # AI Context — cukingPro Web (update terakhir: 21 Okt 2026)
 
 ## Kondisi Saat Ini
-- **Seluruh UI/UX Fase 1–6 SELESAI** (frontend-only + mock data).
-  Backend/E2E belum ada.
+- **UI/UX Fase 1–6 SELESAI** (masih memakai mock untuk data domain).
+- **Backend Fase 0 SELESAI**: PostgreSQL + Drizzle (migrasi jalan),
+  Better Auth (email/password + verifikasi email), `/api/health-check`,
+  format error standar, helper sesi. Form auth sudah memakai Better Auth.
 - Build produksi hijau (`npm run build`), `npx tsc --noEmit` bersih,
   `npx eslint src` **0 error / 0 warning**.
-- Data masih dari `src/lib/mock.ts` (cats, health, berat, pengingat,
-  heat cycles, matings, litters, sales, stud services/bookings,
-  transfers, ownership history, dokumen, timeline). Semua aksi simpan =
-  demo, ada TODO `POST /api/...` di kode.
-- **Bypass demo**: tombol "Masuk sebagai Demo →" di `/login`;
+- Data domain (cats, health, berat, pengingat, heat cycles, matings,
+  litters, sales, stud services/bookings, transfers, ownership history,
+  dokumen, timeline) masih dari `src/lib/mock.ts`. Aksi simpan = demo,
+  ada TODO `POST /api/...`.
+- **Bypass demo**: tombol "Masuk sebagai Demo →" di `/login` masih ada;
   `(app)/layout.tsx` belum ada auth guard.
 - **Gating peran sementara**: `localStorage` (`cukingpro:isBreeder`,
   `cukingpro:isStudProvider`, `cukingpro:onboarded`) diisi lewat
@@ -17,9 +19,22 @@
   tampil kondisional. Dibaca dengan `useSyncExternalStore`.
 - Halaman legal publik: `/kebijakan-privasi`, `/syarat-layanan`.
 
+## Backend yang Sudah Ada
+- `src/db/schema.ts` — tabel auth Better Auth (`user`, `session`,
+  `account`, `verification`); migrasi di `drizzle/`.
+- `src/db/index.ts` — Drizzle + `postgres-js` (singleton saat dev).
+- `src/lib/auth.ts` — Better Auth + Drizzle adapter; verifikasi email
+  wajib; plugin `nextCookies()` terakhir.
+- `src/app/api/auth/[...all]/route.ts` — handler `toNextJsHandler(auth)`.
+- `src/app/api/health-check/route.ts` — `{ ok: true }` + ping DB.
+- `src/lib/session.ts` — `getSession()`, `requireSession()`.
+- `src/lib/api-error.ts` — `ApiError` / `handleRouteError` (PRD §11).
+- `src/lib/email.ts` — stub; tautan verifikasi/reset hanya ke log (dev).
+- Env: `.env.example` (lengkap), `.env` lokal gitignored.
+
 ## Fitur per Halaman (sudah jadi)
 - `/` landing (+tautan legal); auth: `/login`, `/register`,
-  `/forgot-password`, `/verify-email`
+  `/forgot-password`, `/verify-email`, `/reset-password`
 - `/onboarding` (pilih peran breeder / penyedia jasa pacak)
 - `/dashboard` (pengingat 7 hari + banner onboarding), `/kucing`
   (+detail, tambah, edit, silsilah, jual), `/kucing/[id]/kesehatan`
@@ -36,6 +51,8 @@
 
 ## Keputusan Penting (lihat DECISIONS.md untuk detail)
 - Frontend-first: UI & mock dulu; API/DB menyusul per fase PRD.
+- **Backend Fase 0**: Drizzle + `postgres-js`, Better Auth + Drizzle adapter,
+  skema auth mengikuti snapshot resmi Better Auth.
 - Tema "Warm Whiskers" via `@theme inline` di globals.css; fon Plus
   Jakarta Sans; Material Symbols Outlined.
 - Server components dinamis pakai `await connection()` (bukan
@@ -43,13 +60,17 @@
 - Nilai dari `localStorage`/`navigator`/`window` dibaca dengan
   `useSyncExternalStore` (bukan `setState` di dalam `useEffect`) agar
   lolos aturan `react-hooks/set-state-in-effect`.
+- Akses `searchParams` di halaman wajib dibungkus `<Suspense>`
+  (cacheComponents Next 16).
 
 ## Batasan / Yang Perlu Diketahui Agent Berikutnya
-- Belum ada: Better Auth, Drizzle/DB, API routes, service worker,
-  upload foto/dokumen, cron job, Midtrans — Fase 0/5/6.
+- Sudah ada: Better Auth, Drizzle/DB, migrasi, `/api/health-check`.
+- Belum ada: API domain (cats/health/breeding/…), auth guard `(app)`,
+  service worker, upload foto/dokumen, cron job, Midtrans (Fase 1–6).
 - Foto kucing/anggota & dokumen belum bisa diunggah (placeholder UI).
-- Semua form belum terhubung ke API; validasi klien sudah ada, validasi
-  server belum.
+- Form domain belum terhubung ke API; validasi klien sudah ada, validasi
+  server (Zod) baru kerangka di `api-error.ts`.
+- Email verifikasi/reset hanya ke log server (belum ada SMTP).
 - Data mock memakai tanggal relatif hari ini (fungsi `d(n)` di mock.ts)
   agar demo tetap hidup.
 

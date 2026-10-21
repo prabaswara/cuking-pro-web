@@ -4,18 +4,26 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
 
-export function VerifyEmailCard() {
+export function VerifyEmailCard({ email }: { email?: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isResent, setIsResent] = useState(false);
 
   async function handleResend() {
+    if (!email) return;
+
     setIsLoading(true);
-    // TODO: Implement resend verification email
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    setIsResent(true);
-    setTimeout(() => setIsResent(false), 3000);
+    try {
+      await authClient.sendVerificationEmail({
+        email,
+        callbackURL: "/dashboard",
+      });
+      setIsResent(true);
+      setTimeout(() => setIsResent(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -28,7 +36,14 @@ export function VerifyEmailCard() {
         </div>
         <CardTitle className="text-xl">Cek Email Kamu!</CardTitle>
         <CardDescription>
-          Kami telah mengirimkan tautan verifikasi ke email kamu
+          {email ? (
+            <>
+              Kami telah mengirimkan tautan verifikasi ke{" "}
+              <span className="font-semibold text-on-surface">{email}</span>
+            </>
+          ) : (
+            "Kami telah mengirimkan tautan verifikasi ke email kamu"
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -44,7 +59,7 @@ export function VerifyEmailCard() {
           <div className="space-y-3">
             <Button
               onClick={handleResend}
-              disabled={isLoading}
+              disabled={isLoading || !email}
               variant="outline"
               className="h-12 w-full rounded-full text-base font-semibold"
             >

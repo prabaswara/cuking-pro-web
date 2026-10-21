@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
+import { authErrorMessage } from "@/lib/auth-messages";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -19,10 +21,10 @@ export function RegisterForm() {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const name = formData.get("name") as string;
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const confirmPassword = formData.get("confirmPassword") as string;
+    const name = String(formData.get("name") ?? "");
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
     if (password !== confirmPassword) {
       setError("Password tidak cocok");
@@ -37,21 +39,19 @@ export function RegisterForm() {
     }
 
     try {
-      // TODO: Implement actual registration with Better Auth
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+      const { error: signUpError } = await authClient.signUp.email({
+        name,
+        email,
+        password,
+        callbackURL: "/dashboard",
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error?.message || "Gagal mendaftar");
+      if (signUpError) {
+        setError(authErrorMessage(signUpError.code, "Gagal mendaftar"));
         return;
       }
 
-      router.push("/verify-email");
+      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
       router.refresh();
     } catch {
       setError("Terjadi kesalahan. Silakan coba lagi.");

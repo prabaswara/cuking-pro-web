@@ -1,74 +1,73 @@
 # Active Task
 
 ## Status Terakhir
-**Seluruh layar UI/UX Fase 1–6 SELESAI (frontend-only, mock) + polish.**
-Build hijau, TypeScript bersih, ESLint **0 error / 0 warning**.
-Menunggu perintah berikutnya (kandidat utama: mulai backend Fase 0).
+**Backend Fase 0 SELESAI** — Drizzle + PostgreSQL, migrasi, Better Auth
+(email/password + verifikasi email), format error standar, `/api/health-check`,
+dan form auth di frontend sudah memakai Better Auth (bukan endpoint dummy).
+UI Fase 1–6 tetap berjalan dengan mock.
 
-## Progres Sesi Terakhir (21 Okt 2026)
-- Menambahkan tab **Dokumen** di profil kucing
-  (`/kucing/[id]/dokumen`) — brankas sertifikat/vaksin/lab dengan filter
-  kategori, status verifikasi, dialog unggah (placeholder), empty state.
-- Menambahkan tab **Timeline** di profil kucing
-  (`/kucing/[id]/timeline`) — linimasa medis/berat/pakan/breeding dengan
-  filter, meta, dan "muat lebih banyak".
-- Menambahkan **onboarding "Kamu siapa?"** (`/onboarding`) + banner di
-  Beranda; peran disimpan ke `localStorage`
-  (`cukingpro:isBreeder`, `cukingpro:isStudProvider`,
-  `cukingpro:onboarded`).
-- Menambahkan halaman **Kebijakan Privasi** dan **Syarat Layanan**
-  (`(marketing)` route group) + tautan di footer landing.
-- Tipe & mock baru: `CatDocument`, `TimelineEvent` di `src/types` dan
-  `src/lib/mock.ts` (helper `getCatDocuments`, `getTimelineForCat`,
-  label kategori).
-- **Bersih-bersih kualitas**: memperbaiki 16 error + 31 warning ESLint
-  lama (unused imports, `any`, `require()`, `set-state-in-effect`,
-  unescaped entities). Pola `set-state-in-effect` diganti
-  `useSyncExternalStore`.
-- Menambahkan `&display=swap` pada font Material Symbols + disable rule
-  `no-page-custom-font` (ikon font, bukan teks).
+Build hijau, TypeScript bersih, ESLint 0 error / 0 warning.
+
+## Progres Sesi Ini (21 Okt 2026)
+- Menambahkan dependensi: `drizzle-orm`, `drizzle-kit`, `postgres`,
+  `better-auth`, `zod`, `tsx`, `dotenv`.
+- `src/db/schema.ts` — tabel auth resmi Better Auth (`user`, `session`,
+  `account`, `verification`) + relasi. Migrasi: `drizzle/0000_*.sql`.
+- `src/db/index.ts` — Drizzle + postgres-js, singleton saat dev.
+- `drizzle.config.ts` + skrip `db:generate`, `db:migrate`, `db:studio`.
+- `src/lib/auth.ts` — Better Auth + Drizzle adapter, `requireEmailVerification`,
+  `minPasswordLength: 8`, plugin `nextCookies()`, stub email.
+- `src/lib/email.ts` — stub email: tautan hanya ditulis ke log (dev).
+- `src/lib/session.ts` — `getSession()` / `requireSession()`.
+- `src/lib/api-error.ts` — `ApiError` + `handleRouteError` sesuai format PRD §11.
+- `src/app/api/auth/[...all]/route.ts` + `src/app/api/health-check/route.ts`.
+- Form auth disesuaikan ke Better Auth: login (termasuk "Kirim ulang"
+  verifikasi), register, lupa password, halaman `/reset-password` baru,
+  kirim ulang di `/verify-email`, dan tombol Keluar di `/pengaturan`.
+- `.env.example`, `.env` lokal (gitignored), README setup, `.gitignore`
+  dikecualikan untuk `.env.example`.
+- `next.config.ts`: `turbopack.root` dikunci ke folder proyek (menghapus
+  warning package-lock liar di home directory).
+- Halaman `/verify-email` & `/reset-password` membungkus akses `searchParams`
+  dengan `<Suspense>` (wajib di Next 16 + cacheComponents).
 
 ## Hasil Verifikasi
 - `npx tsc --noEmit` → bersih
 - `npx eslint src` → 0 error, 0 warning
-- `npm run build` → sukses (static + partial prerender)
-- Runtime (production server) → 200 untuk: `/dashboard`, `/breeding`,
-  `/jasa-pacak`, `/notifikasi`, `/pengaturan`, `/kucing`,
-  `/kucing/cat-mochi`, `/kucing/cat-mochi/kesehatan`,
-  `/kucing/cat-mochi/timeline`, `/kucing/cat-mochi/dokumen`,
-  `/breeding/kehamilan/mating-1`, `/breeding/litter/litter-1`,
-  `/onboarding`, `/kebijakan-privasi`, `/syarat-layanan`
+- `npm run db:migrate` → 4 tabel dibuat (`user`, `session`, `account`,
+  `verification`)
+- `npm run build` → sukses
+- Uji API (dev & production build):
+  - `GET /api/health-check` → `200 {"ok":true}`
+  - sign-up → 200, email verifikasi tercatat di log
+  - login sebelum verifikasi → `403 EMAIL_NOT_VERIFIED`
+  - buka tautan verifikasi → 302 ke `/`
+  - login setelah verifikasi → 200 + sesi valid (`get-session`)
+  - request reset password → 200; reset dengan token → 200; login password
+    baru → 200
+- Halaman `/login`, `/register`, `/verify-email`, `/reset-password`,
+  `/pengaturan` → 200 (dev & production)
 
 ## Masalah yang Belum Selesai (diketahui)
-1. Semua form masih demo/mock; belum ada API (`TODO: POST /api/...`).
-2. Auth guard belum ada di `(app)/layout.tsx` (bypass demo).
-3. Upload foto & dokumen belum berfungsi (UI placeholder).
-4. Service worker Web Push & Midtrans belum ada.
-5. Data peran masih di `localStorage`, nanti pindah ke profil DB.
+1. Modul selain auth masih memakai `src/lib/mock.ts`.
+2. Belum ada auth guard di `(app)/layout.tsx` (bypass demo masih ada).
+3. Pengiriman email nyata belum ada (SMTP stub).
+4. Upload foto/dokumen, Web Push, Midtrans belum ada.
+5. Logout belum menghapus langganan Web Push (TODO FR-21).
 
-## Langkah Berikutnya (pilih salah satu)
-A. **Backend Fase 0 (disarankan)**: Drizzle schema + Better Auth +
-   `.env.example` + route handler auth.
-B. Sambungkan modul satu-per-satu ke API (mulai dari kucing & kesehatan).
-C. Ganti gating `localStorage` dengan sesi + profil DB.
+## Langkah Berikutnya
+A. **Fase 1**: skema `profiles`, `cats`, `cat_ownership_history` + modul
+   `plan.ts` + auth guard `(app)` (paling logis setelah Fase 0).
+B. Sambungkan modul kucing & kesehatan ke API.
+C. Tambah `profiles` + ganti gating peran dari `localStorage` ke DB.
 
 ## File Penting yang Diubah Sesi Ini
-- `src/types/index.ts`, `src/lib/mock.ts` (tipe & mock dokumen/timeline)
-- `src/app/(app)/kucing/[id]/dokumen/page.tsx` (baru)
-- `src/app/(app)/kucing/[id]/timeline/page.tsx` (baru)
-- `src/components/dokumen/document-list.tsx` (baru)
-- `src/components/kucing/timeline-list.tsx` (baru)
-- `src/app/(app)/onboarding/page.tsx` (baru)
-- `src/components/onboarding/onboarding-banner.tsx` (baru)
-- `src/app/(marketing)/**` (layout + privasi + syarat, baru)
-- `src/app/(app)/kucing/[id]/page.tsx` (tab Timeline/Dokumen)
-- `src/app/(app)/dashboard/page.tsx` (banner onboarding)
-- `src/app/page.tsx` (tautan footer)
-- Perbaikan lint: `breeding/**`, `jasa-pacak/**`,
-  `components/layout/{sidebar,bottom-nav}.tsx`,
-  `components/notifikasi/notifikasi-content.tsx`,
-  `components/breeding/mating-list.tsx`,
-  `components/penjualan/sales-list.tsx`,
-  `components/pacak/stud-booking-list.tsx`,
-  `components/transfer/{transfer-list,ownership-history-list}.tsx`,
-  `src/app/layout.tsx`
+- Baru: `drizzle.config.ts`, `drizzle/`, `.env.example`,
+  `src/db/{index,schema}.ts`, `src/lib/{auth,auth-client,auth-messages,email,session,api-error}.ts`,
+  `src/app/api/auth/[...all]/route.ts`, `src/app/api/health-check/route.ts`,
+  `src/app/(auth)/reset-password/page.tsx`,
+  `src/components/auth/reset-password-form.tsx`,
+  `src/components/profil/logout-button.tsx`
+- Diubah: `package.json`, `next.config.ts`, `.gitignore`, `README.md`,
+  `src/components/auth/{login-form,register-form,forgot-password-form,verify-email-card}.tsx`,
+  `src/app/(auth)/verify-email/page.tsx`, `src/app/(app)/pengaturan/page.tsx`

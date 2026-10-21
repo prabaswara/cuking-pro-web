@@ -7,11 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
+import { authErrorMessage } from "@/lib/auth-messages";
 
 export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState(false);
+  const [isResent, setIsResent] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,21 +24,23 @@ export function LoginForm() {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+
+    setUnverifiedEmail(null);
+    setIsResent(false);
 
     try {
-      // TODO: Implement actual login with Better Auth
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error?.message || "Email atau password salah");
+      if (signInError) {
+        setError(authErrorMessage(signInError.code, "Email atau password salah"));
+        if (signInError.code === "EMAIL_NOT_VERIFIED") {
+          setUnverifiedEmail(email);
+        }
         return;
       }
 
@@ -43,6 +50,21 @@ export function LoginForm() {
       setError("Terjadi kesalahan. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!unverifiedEmail) return;
+
+    setIsResending(true);
+    try {
+      await authClient.sendVerificationEmail({
+        email: unverifiedEmail,
+        callbackURL: "/dashboard",
+      });
+      setIsResent(true);
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -58,7 +80,22 @@ export function LoginForm() {
         <form onSubmit={onSubmit} className="space-y-4">
           {error && (
             <div className="rounded-2xl bg-error-container p-4 text-sm text-error">
-              {error}
+              <p>{error}</p>
+              {unverifiedEmail && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResendVerification}
+                  disabled={isResending}
+                  className="mt-3 h-10 w-full rounded-full text-sm font-semibold"
+                >
+                  {isResending
+                    ? "Mengirim..."
+                    : isResent
+                      ? "Email verifikasi terkirim"
+                      : "Kirim ulang email verifikasi"}
+                </Button>
+              )}
             </div>
           )}
 
@@ -103,10 +140,10 @@ export function LoginForm() {
           </Button>
         </form>
 
-        {/* Bypass demo sementara — hapus saat Better Auth dipasang */}
+        {/* Bypass demo sementara — hapus saat auth guard (app) dipasang */}
         <div className="mt-4 rounded-2xl bg-amber-subtle p-3 text-center">
           <p className="text-xs text-text-muted">
-            Backend auth belum dipasang. Untuk preview UI:
+            Ingin melihat UI tanpa membuat akun?
           </p>
           <Button
             type="button"

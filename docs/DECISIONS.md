@@ -44,6 +44,36 @@ Format: **Tanggal — Keputusan** (alasan → dampak)
   rule `no-page-custom-font` di-disable untuk baris itu → `next/font` tidak
   cocok untuk icon-font dengan ligatur.
 
+## 2026-10-21
+- **Backend Fase 0 dikerjakan lebih dulu dari sisa penyambungan UI**
+  (PRD menaruh setup DB/auth di Fase 0) → fondasi sesi & DB siap sebelum
+  modul domain dipindah dari mock.
+- **Drizzle + `postgres-js`, bukan `node-postgres`** (driver ringan, pool
+  bawaan, contoh resmi Context7) → satu koneksi singleton di
+  `src/db/index.ts`, di-cache di `globalThis` saat dev agar HMR tidak
+  membanjiri pool.
+- **Skema auth ditulis manual mengikuti snapshot resmi Better Auth**
+  (CLI `@better-auth/cli generate` gagal dipasang karena bug npm
+  `edgesOut`) → nama tabel default `user`/`session`/`account`/`verification`
+  dipertahankan; migrasi Drizzle yang jadi sumber kebenaran.
+- **Verifikasi email wajib sejak awal** (sesuai FR-01) +
+  `sendVerificationEmail`/`sendResetPassword` memakai stub `sendEmail`
+  → tautan hanya dicetak di log saat dev, tidak pernah di log produksi.
+- **Form auth memakai `authClient` Better Auth**, bukan `fetch` ke
+  endpoint buatan sendiri (`/api/auth/login`, `/register`) yang tidak
+  pernah ada → pesan error dipetakan ke Bahasa Indonesia lewat
+  `src/lib/auth-messages.ts`; tidak membocorkan email vs password salah.
+- **Lupa password selalu menampilkan status "terkirim"** → mencegah
+  enumerasi akun.
+- **Akses `searchParams` di `/verify-email` dan `/reset-password`
+  dibungkus `<Suspense>`** (Next 16 + cacheComponents gagal build bila
+  tidak) → halaman tetap bisa di-prerender sebagian.
+- **`turbopack.root` dikunci ke folder proyek** (ada `package-lock.json`
+  liar di home directory) → warning workspace root hilang tanpa menghapus
+  file milik pengguna.
+- **`.gitignore` dikecualikan untuk `.env.example`** (`!.env.example`)
+  → contoh env tetap bisa di-commit, `.env` tetap aman.
+
 ## Template entri baru
 ```
 ## YYYY-MM-DD

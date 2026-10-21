@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# cukingPro Web
 
-## Getting Started
+Aplikasi web manajemen kucing (SaaS) — Next.js 16 App Router, TypeScript,
+Tailwind v4, shadcn/ui, Drizzle ORM + PostgreSQL, Better Auth.
 
-First, run the development server:
+Referensi produk: `../PRD-cuking-pro-web.md` (sumber kebenaran requirement).
+Konteks untuk agent: `AGENTS.md` dan `docs/`.
+
+## Prasyarat
+
+- Node.js 20+ (proyek ini diuji di Node 22)
+- PostgreSQL 16+
+- npm
+
+## Menjalankan Lokal
 
 ```bash
+# 1. Install dependensi (dari folder cuking-pro-web/, bukan folder induk)
+npm install
+
+# 2. Siapkan environment
+cp .env.example .env
+#    Isi DATABASE_URL, lalu buat secret: openssl rand -base64 32
+
+# 3. Buat database (contoh)
+createdb cukingpro
+
+# 4. Jalankan migrasi
+npm run db:migrate
+
+# 5. Jalankan dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Perintah
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Perintah | Fungsi |
+|---|---|
+| `npm run dev` | Server pengembangan (Turbopack) |
+| `npm run build` | Build produksi (wajib hijau) |
+| `npm run start` | Jalankan hasil build |
+| `npm run lint` | ESLint |
+| `npx tsc --noEmit` | Cek TypeScript |
+| `npm run db:generate` | Generate migrasi dari `src/db/schema.ts` |
+| `npm run db:migrate` | Terapkan migrasi ke database |
+| `npm run db:studio` | Drizzle Studio |
 
-## Learn More
+## Struktur Singkat
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── (marketing)/   # landing, kebijakan privasi, syarat layanan
+│   ├── (auth)/        # login, register, verify-email, lupa/reset password
+│   ├── (app)/         # area aplikasi (Header, Sidebar, BottomNav)
+│   └── api/
+│       ├── auth/[...all]/   # handler Better Auth
+│       └── health-check/    # GET /api/health-check → { ok: true }
+├── components/        # UI per domain
+├── db/                # koneksi Drizzle + skema
+└── lib/               # auth, session, api-error, email, mock
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Auth (Better Auth)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Tabel: `user`, `session`, `account`, `verification` (dibuat oleh migrasi).
+- Email + password, **wajib verifikasi email** sebelum login.
+- Selama `SMTP_HOST` kosong, tautan verifikasi/reset hanya dicetak di log
+  server saat mode development (tidak dikirim ke produksi).
+- Helper sesi: `src/lib/session.ts` (`getSession`, `requireSession`).
 
-## Deploy on Vercel
+## Catatan
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/lib/mock.ts` masih menjadi sumber data UI untuk modul non-auth.
+- `.env` tidak boleh di-commit; gunakan `.env.example` sebagai acuan.
