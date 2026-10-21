@@ -1,4 +1,4 @@
-import { ZodError } from "zod";
+import { ZodError, type ZodType } from "zod";
 
 /**
  * Format error standar (PRD §11):
@@ -78,4 +78,29 @@ export function handleRouteError(error: unknown) {
 
   console.error("[api] unhandled error:", error);
   return errorResponse("INTERNAL_ERROR", "Terjadi kesalahan pada server.");
+}
+
+/**
+ * Baca + validasi body JSON dengan Zod.
+ * Melempar ApiError VALIDATION_ERROR dengan `field` terkait.
+ */
+export async function parseBody<T>(request: Request, schema: ZodType<T>): Promise<T> {
+  let payload: unknown;
+
+  try {
+    payload = await request.json();
+  } catch {
+    throw new ApiError("VALIDATION_ERROR", "Body JSON tidak valid.");
+  }
+
+  const result = schema.safeParse(payload);
+
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    throw new ApiError("VALIDATION_ERROR", issue?.message ?? "Data tidak valid.", {
+      field: issue?.path.join(".") || undefined,
+    });
+  }
+
+  return result.data;
 }
