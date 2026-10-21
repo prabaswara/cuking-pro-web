@@ -1,10 +1,15 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  date,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
+  uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -85,9 +90,130 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const userRelations = relations(user, ({ many }) => ({
+// ============================================================
+// Fase 1 — profil, paket, kucing, kepemilikan
+// ============================================================
+
+export const plans = pgTable("plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  priceIdr: integer("price_idr").notNull(),
+  durationDays: integer("duration_days").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id, { onDelete: "restrict" }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("subscriptions_user_id_idx").on(table.userId),
+    index("subscriptions_ends_at_idx").on(table.endsAt),
+  ],
+);
+
+export const profiles = pgTable("profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  whatsapp: text("whatsapp"),
+  kennelName: text("kennel_name"),
+  avatarPath: text("avatar_path"),
+  isBreeder: boolean("is_breeder").default(false).notNull(),
+  isStudProvider: boolean("is_stud_provider").default(false).notNull(),
+  emailRemindersEnabled: boolean("email_reminders_enabled").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const cats = pgTable(
+  "cats",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sex: text("sex", { enum: ["male", "female"] }).notNull(),
+    breed: text("breed"),
+    color: text("color"),
+    birthDate: date("birth_date"),
+    photoPath: text("photo_path"),
+    isNeutered: boolean("is_neutered").default(false).notNull(),
+    microchipNo: text("microchip_no"),
+    pedigreeNo: text("pedigree_no"),
+    // Hanya boleh merujuk kucing milik pemilik yang sama (dijaga di lapisan API).
+    sireId: uuid("sire_id").references((): AnyPgColumn => cats.id, {
+      onDelete: "set null",
+    }),
+    sireNameManual: text("sire_name_manual"),
+    damId: uuid("dam_id").references((): AnyPgColumn => cats.id, {
+      onDelete: "set null",
+    }),
+    damNameManual: text("dam_name_manual"),
+    // `litter_id` ditambahkan pada Fase 3 bersama tabel `litters`.
+    status: text("status", { enum: ["active", "sold", "deceased"] })
+      .default("active")
+      .notNull(),
+    trackingStatus: text("tracking_status", { enum: ["tracked", "frozen"] })
+      .default("tracked")
+      .notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("cats_owner_id_idx").on(table.ownerId),
+    index("cats_status_idx").on(table.status),
+  ],
+);
+
+export const catOwnershipHistory = pgTable(
+  "cat_ownership_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catId: uuid("cat_id").references(() => cats.id, { onDelete: "set null" }),
+    catName: text("cat_name").notNull(),
+    ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
+    ownerDisplayName: text("owner_display_name").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    acquiredVia: text("acquired_via", { enum: ["created", "transfer"] }).notNull(),
+    // `transfer_id` ditambahkan pada Fase 5 bersama tabel `cat_transfers`.
+  },
+  (table) => [
+    index("cat_ownership_history_cat_id_idx").on(table.catId),
+    index("cat_ownership_history_owner_id_idx").on(table.ownerId),
+    // Satu baris kepemilikan aktif (ended_at kosong) per kucing.
+    uniqueIndex("cat_ownership_history_current_uidx")
+      .on(table.catId)
+      .where(sql`${table.endedAt} is null`),
+  ],
+);
+
+// ============================================================
+// Relasi
+// ============================================================
+
+export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),
+  cats: many(cats),
+  subscriptions: many(subscriptions),
+  profile: one(profiles, {
+    fields: [user.id],
+    references: [profiles.userId],
+  }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -103,3 +229,57 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const profilesRelations = relations(profiles, ({ one }) => ({
+  user: one(user, {
+    fields: [profiles.userId],
+    references: [user.id],
+  }),
+}));
+
+export const plansRelations = relations(plans, ({ many }) => ({
+  subscriptions: many(subscriptions),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(user, {
+    fields: [subscriptions.userId],
+    references: [user.id],
+  }),
+  plan: one(plans, {
+    fields: [subscriptions.planId],
+    references: [plans.id],
+  }),
+}));
+
+export const catsRelations = relations(cats, ({ one, many }) => ({
+  owner: one(user, {
+    fields: [cats.ownerId],
+    references: [user.id],
+  }),
+  sire: one(cats, {
+    fields: [cats.sireId],
+    references: [cats.id],
+    relationName: "cat_sire",
+  }),
+  dam: one(cats, {
+    fields: [cats.damId],
+    references: [cats.id],
+    relationName: "cat_dam",
+  }),
+  ownershipHistory: many(catOwnershipHistory),
+}));
+
+export const catOwnershipHistoryRelations = relations(
+  catOwnershipHistory,
+  ({ one }) => ({
+    cat: one(cats, {
+      fields: [catOwnershipHistory.catId],
+      references: [cats.id],
+    }),
+    owner: one(user, {
+      fields: [catOwnershipHistory.ownerId],
+      references: [user.id],
+    }),
+  }),
+);

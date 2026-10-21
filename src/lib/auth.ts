@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
+import { profiles } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 
 /**
@@ -40,6 +41,19 @@ export const auth = betterAuth({
         subject: "Verifikasi email cukingPro",
         text: `Halo ${user.name},\n\nVerifikasi email kamu dengan membuka tautan berikut:\n${url}\n\nTautan berlaku 1 jam.`,
       });
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Setiap pengguna langsung punya baris profil (FR-02).
+        after: async (createdUser) => {
+          await db
+            .insert(profiles)
+            .values({ userId: createdUser.id })
+            .onConflictDoNothing();
+        },
+      },
     },
   },
   // nextCookies() harus menjadi plugin terakhir.
