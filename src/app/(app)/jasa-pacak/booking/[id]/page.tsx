@@ -86,8 +86,6 @@ function BookingDetail({ booking }: { booking: StudBooking }) {
     }
     setMatingError("");
     // TODO: POST /api/stud-bookings/:id/matings
-    const isEarlier = firstMating && matingDate < firstMating.matingDate;
-    const newFirst = isEarlier ? matingDate : firstMating?.matingDate;
     setMatings((prev) => [...prev, { id: `sm-${Date.now()}`, bookingId: booking.id, matingDate, notes: matingNotes }].sort((a, b) => a.matingDate.localeCompare(b.matingDate)));
     setMatingDate("");
     setMatingNotes("");

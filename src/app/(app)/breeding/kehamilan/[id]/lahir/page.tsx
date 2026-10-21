@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { getMating, getQueenDisplayName } from "@/lib/mock";
 import { formatDateID } from "@/lib/mock";
+import type { Mating } from "@/types";
 
 interface LahirPageProps {
   params: Promise<{ id: string }>;
@@ -16,7 +17,7 @@ interface LahirPageProps {
 
 export default function LahirPage({ params }: LahirPageProps) {
   const router = useRouter();
-  const [matingData, setMatingData] = useState<any>(null);
+  const [matingData, setMatingData] = useState<Mating | null>(null);
   const [loading, setLoading] = useState(true);
   const [birthDate, setBirthDate] = useState("");
   const [totalBorn, setTotalBorn] = useState("");
@@ -27,10 +28,9 @@ export default function LahirPage({ params }: LahirPageProps) {
 
   useEffect(() => {
     // Client-side mock fetch
-    const { getMating: getMatingMock } = require("@/lib/mock");
     params.then(({ id }) => {
-      const data = getMatingMock(id);
-      setMatingData(data);
+      const data = getMating(id);
+      setMatingData(data ?? null);
       setLoading(false);
     });
   }, [params]);
@@ -59,6 +59,7 @@ export default function LahirPage({ params }: LahirPageProps) {
   }
 
   const queenName = getQueenDisplayName(matingData);
+  const matingId = matingData.id;
 
   function todayStr() {
     const t = new Date();
@@ -80,7 +81,7 @@ export default function LahirPage({ params }: LahirPageProps) {
     // TODO: POST /api/matings/:id/litter
     setTimeout(() => {
       setSaving(false);
-      router.push(`/breeding/litter/new?matingId=${matingData.id}`);
+      router.push(`/breeding/litter/new?matingId=${matingId}`);
     }, 800);
   }
 

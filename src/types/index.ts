@@ -255,3 +255,39 @@ export interface OwnershipHistory {
   acquiredVia: 'created' | 'transfer';
   transferId?: string | null;
 }
+
+// Cat Document Types (tab "Dokumen")
+export type CatDocumentCategory =
+  | 'pedigree'
+  | 'vaccine_book'
+  | 'lab'
+  | 'registration'
+  | 'other';
+
+export interface CatDocument {
+  id: string;
+  catId: string;
+  title: string;
+  category: CatDocumentCategory;
+  fileType: 'pdf' | 'image';
+  sizeLabel: string;
+  uploadedAt: string;
+  source?: string | null;
+  statusLabel: string;
+  verified: boolean;
+  notes?: string | null;
+}
+
+// Cat Timeline Types (tab "Timeline")
+export type TimelineCategory = 'medical' | 'weight' | 'feeding' | 'breeding' | 'note';
+
+export interface TimelineEvent {
+  id: string;
+  catId: string;
+  category: TimelineCategory;
+  title: string;
+  description?: string | null;
+  eventDate: string;
+  eventTime?: string | null;
+  meta?: Record<string, string> | null;
+}

@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OnboardingBanner } from "@/components/onboarding/onboarding-banner";
 import Link from "next/link";
 import { connection } from "next/server";
 import { formatDateID, getCatName, mockCats, mockMatings, mockReminders } from "@/lib/mock";
@@ -23,6 +24,8 @@ export default async function DashboardPage() {
           Semua anabulmu dalam kondisi prima hari ini.
         </p>
       </div>
+
+      <OnboardingBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

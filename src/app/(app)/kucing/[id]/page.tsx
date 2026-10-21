@@ -139,6 +139,12 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
           Ringkasan
         </span>
         <Link
+          href={`/kucing/${cat.id}/timeline`}
+          className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted shadow-sm transition-all hover:text-on-surface active:scale-95"
+        >
+          Timeline
+        </Link>
+        <Link
           href={`/kucing/${cat.id}/kesehatan`}
           className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted shadow-sm transition-all hover:text-on-surface active:scale-95"
         >
@@ -149,6 +155,12 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
           className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted shadow-sm transition-all hover:text-on-surface active:scale-95"
         >
           Berat
+        </Link>
+        <Link
+          href={`/kucing/${cat.id}/dokumen`}
+          className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted shadow-sm transition-all hover:text-on-surface active:scale-95"
+        >
+          Dokumen
         </Link>
         <Link
           href={`/kucing/${cat.id}/silsilah`}
@@ -162,12 +174,6 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
         >
           Breeding
         </Link>
-        <span
-          title="Segera hadir"
-          className="whitespace-nowrap rounded-full bg-surface-card px-4 py-2 text-sm font-medium text-text-muted/50"
-        >
-          Dokumen
-        </span>
       </div>
 
       {/* Overview Content */}

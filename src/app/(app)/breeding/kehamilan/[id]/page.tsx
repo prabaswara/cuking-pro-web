@@ -2,9 +2,8 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getMating, getLitterByMating, getQueenDisplayName, getSireDisplayName, getCatName, mockMatings } from "@/lib/mock";
+import { getMating, getLitterByMating, getQueenDisplayName, getSireDisplayName } from "@/lib/mock";
 import { formatDateID, daysUntil } from "@/lib/mock";
-import type { Mating } from "@/types";
 
 interface KehamilanPageProps {
   params: Promise<{ id: string }>;

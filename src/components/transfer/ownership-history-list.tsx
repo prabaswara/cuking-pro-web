@@ -1,8 +1,7 @@
 "use client";
 
 import { getOwnershipHistory, formatDateID } from "@/lib/mock";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
 
 export function OwnershipHistoryList() {
   const history = getOwnershipHistory("cat-mochi");

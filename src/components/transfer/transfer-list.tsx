@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDateID, daysUntil, getTransfersForUser, getCatName, mockCats, getOwnershipHistory } from "@/lib/mock";
+import { formatDateID, daysUntil, getTransfersForUser, mockCats, getOwnershipHistory } from "@/lib/mock";
 import type { CatTransfer } from "@/types";
 
 const STATUS_STYLE: Record<CatTransfer["status"], { bg: string; text: string; label: string }> = {

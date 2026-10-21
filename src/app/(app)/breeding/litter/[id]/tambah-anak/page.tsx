@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getLitterByMating, mockLitters, getMating, getQueenDisplayName, getSireDisplayName } from "@/lib/mock";
+import { mockLitters, getMating, getQueenDisplayName, getSireDisplayName } from "@/lib/mock";
 import { formatDateID } from "@/lib/mock";
 import { TambahAnakForm } from "./TambahAnakForm";
 

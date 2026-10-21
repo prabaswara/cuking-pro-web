@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { KesehatanList } from "@/components/kesehatan/kesehatan-list";
-import { getCatName, getMockCat } from "@/lib/mock";
+import { getMockCat } from "@/lib/mock";
 
 interface KesehatanPageProps {
   params: Promise<{ id: string }>;

@@ -1,20 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { StudServiceList } from "@/components/pacak/stud-service-list";
 import { StudBookingList } from "@/components/pacak/stud-booking-list";
 
-export default function JasaPacakPage() {
-  const [isStudProvider, setIsStudProvider] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pejantan" | "booking">("booking");
+const subscribe = () => () => {};
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("cukingpro:isStudProvider");
-      setIsStudProvider(stored === "true");
-    } catch {}
-  }, []);
+function readFlag(key: string): string {
+  if (typeof window === "undefined") return "false";
+  try {
+    return localStorage.getItem(key) === "true" ? "true" : "false";
+  } catch {
+    return "false";
+  }
+}
+
+export default function JasaPacakPage() {
+  const [activeTab, setActiveTab] = useState<"pejantan" | "booking">("booking");
+  const isStudProvider =
+    useSyncExternalStore(
+      subscribe,
+      () => readFlag("cukingpro:isStudProvider"),
+      () => "false",
+    ) === "true";
 
   if (!isStudProvider) {
     return (
@@ -32,7 +41,7 @@ export default function JasaPacakPage() {
           </div>
           <h2 className="text-xl font-bold text-on-surface">Fitur Jasa Pacak Tersembunyi</h2>
           <p className="mt-2 max-w-md mx-auto text-text-muted">
-            Aktifkan peran "Saya Menyediakan Jasa Pacak" di <Link href="/profil" className="text-primary underline">Profil</Link>
+            Aktifkan peran &ldquo;Saya Menyediakan Jasa Pacak&rdquo; di <Link href="/profil" className="text-primary underline">Profil</Link>
             untuk mengakses fitur manajemen pejantan pacak dan booking klien.
           </p>
           <div className="mt-6">

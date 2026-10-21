@@ -615,3 +615,195 @@ export function getTransfersForUser(userId: string): CatTransfer[] {
 export function getOwnershipHistory(catId: string): OwnershipHistory[] {
   return mockOwnershipHistory.filter((o) => o.catId === catId);
 }
+
+// ========================================
+// MOCK — DOKUMEN & TIMELINE (tab profil kucing)
+// (ganti dengan fetch /api saat backend siap)
+// ========================================
+
+import type { CatDocument, TimelineEvent } from "@/types";
+
+export const mockCatDocuments: CatDocument[] = [
+  {
+    id: "doc-pedigree",
+    catId: "cat-mochi",
+    title: "Pedigree CFA 5-Generation Official.pdf",
+    category: "pedigree",
+    fileType: "pdf",
+    sizeLabel: "3.2 MB",
+    uploadedAt: "2024-08-14",
+    source: "CFA Secretariat",
+    statusLabel: "Terverifikasi",
+    verified: true,
+    notes: "Asli — 5 generasi tercatat.",
+  },
+  {
+    id: "doc-vaccine-book",
+    catId: "cat-mochi",
+    title: "Buku Vaksinasi Lengkap (Halaman 1-4).pdf",
+    category: "vaccine_book",
+    fileType: "pdf",
+    sizeLabel: "1.8 MB",
+    uploadedAt: "2026-05-12",
+    source: "Klinik Satwa Sehat",
+    statusLabel: "Aktif & Valid",
+    verified: true,
+    notes: "Tricat & Rabies.",
+  },
+  {
+    id: "doc-usg",
+    catId: "cat-mochi",
+    title: "Hasil USG Gestasi Trimester 2.pdf",
+    category: "lab",
+    fileType: "pdf",
+    sizeLabel: "4.5 MB",
+    uploadedAt: "2026-09-15",
+    source: "VetCare (Drh. Sarah)",
+    statusLabel: "4 Fetus Terpantau",
+    verified: false,
+    notes: "Hari ke-35 gestasi.",
+  },
+  {
+    id: "doc-microchip",
+    catId: "cat-mochi",
+    title: "Sertifikat Registrasi Mikrocip ISO 11784.pdf",
+    category: "registration",
+    fileType: "pdf",
+    sizeLabel: "950 KB",
+    uploadedAt: "2024-06-20",
+    source: "Microchip ID Center",
+    statusLabel: "ID Terpasang",
+    verified: true,
+    notes: "Subkutan leher, nomor 9810982341.",
+  },
+  {
+    id: "doc-felv-fiv",
+    catId: "cat-mochi",
+    title: "Hasil Skrining Darah & Tes FeLV-FIV.pdf",
+    category: "lab",
+    fileType: "pdf",
+    sizeLabel: "850 KB",
+    uploadedAt: "2026-07-20",
+    source: "Lab Patologi Vet Clinic",
+    statusLabel: "Negatif / Bersih",
+    verified: true,
+    notes: "Layak breeding.",
+  },
+  {
+    id: "doc-adoption",
+    catId: "cat-mochi",
+    title: "Kontrak Adopsi & Sertifikat Kepemilikan.pdf",
+    category: "other",
+    fileType: "pdf",
+    sizeLabel: "1.1 MB",
+    uploadedAt: "2024-02-02",
+    source: "Royal Fluff Cattery",
+    statusLabel: "Arsip",
+    verified: false,
+    notes: null,
+  },
+];
+
+export function getCatDocuments(catId: string): CatDocument[] {
+  return mockCatDocuments
+    .filter((doc) => doc.catId === catId)
+    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+}
+
+export const DOCUMENT_CATEGORY_LABEL: Record<CatDocument["category"], string> = {
+  pedigree: "Pedigree",
+  vaccine_book: "Buku Vaksin",
+  lab: "Hasil Lab / USG",
+  registration: "Registrasi",
+  other: "Lainnya",
+};
+
+export function documentCategoryLabel(category: CatDocument["category"]): string {
+  return DOCUMENT_CATEGORY_LABEL[category];
+}
+
+export const TIMELINE_CATEGORY_LABEL: Record<TimelineEvent["category"], string> = {
+  medical: "Medis & Vaksin",
+  weight: "Berat Badan",
+  feeding: "Pakan",
+  breeding: "Breeding",
+  note: "Catatan Harian",
+};
+
+export function timelineCategoryLabel(category: TimelineEvent["category"]): string {
+  return TIMELINE_CATEGORY_LABEL[category];
+}
+
+export const mockTimelineEvents: TimelineEvent[] = [
+  {
+    id: "tl-feeding-1",
+    catId: "cat-mochi",
+    category: "feeding",
+    title: "Royal Canin Mother & Babycat 85g",
+    description:
+      "Nafsu makan sangat baik, porsi dihabiskan dalam 10 menit. Minum air bersih tercukupi.",
+    eventDate: d(0),
+    eventTime: "10:30 WIB",
+    meta: { status: "Lahap", petugas: "Rian (Staff)" },
+  },
+  {
+    id: "tl-weight-1",
+    catId: "cat-mochi",
+    category: "weight",
+    title: "4.2 kg",
+    description:
+      "Kenaikan berat badan stabil dan sehat untuk masa gestasi hari ke-37. Perut mulai terasa membulat dan padat.",
+    eventDate: d(-1),
+    eventTime: "16:00 WIB",
+    meta: { delta: "+100g" },
+  },
+  {
+    id: "tl-medical-1",
+    catId: "cat-mochi",
+    category: "medical",
+    title: "USG & Evaluasi Kehamilan (Mid-Term)",
+    description:
+      "Klinik VetCare Puri bersama Drh. Sarah Sp.K. Detak jantung janin normal, perkiraan 4 kitten aktif berkembang sehat.",
+    eventDate: d(-36),
+    eventTime: null,
+    meta: null,
+  },
+  {
+    id: "tl-medical-2",
+    catId: "cat-mochi",
+    category: "medical",
+    title: "Vitamin Prenatal & Kalsium Organik",
+    description:
+      "Dosis harian 1 tablet kunyah rasa tuna. Dikonsumsi tanpa kendala bersama sarapan.",
+    eventDate: d(-41),
+    eventTime: null,
+    meta: null,
+  },
+  {
+    id: "tl-medical-3",
+    catId: "cat-mochi",
+    category: "medical",
+    title: "Konfirmasi USG Kehamilan Positif (Hari ke-10)",
+    description:
+      "Kantung gestasi pertama terdeteksi jelas pada rahim kiri dan kanan. Program transisi diet induk hamil diaktifkan.",
+    eventDate: d(-50),
+    eventTime: null,
+    meta: null,
+  },
+  {
+    id: "tl-breeding-1",
+    catId: "cat-mochi",
+    category: "breeding",
+    title: "Kawin Berhasil dengan Simba",
+    description: "Pejantan registrasi CFA • Sesi 3 hari.",
+    eventDate: d(-50),
+    eventTime: null,
+    meta: { partner: "Simba (Maine Coon Tabby)" },
+  },
+];
+
+export function getTimelineForCat(catId: string): TimelineEvent[] {
+  return mockTimelineEvents
+    .filter((e) => e.catId === catId)
+    .sort((a, b) => b.eventDate.localeCompare(a.eventDate));
+}

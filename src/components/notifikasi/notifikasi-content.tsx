@@ -1,27 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+const subscribe = () => () => {};
+
+function readPushSupport(): string {
+  if (typeof window === "undefined") return "unknown";
+  return "Notification" in window && "serviceWorker" in navigator
+    ? "yes"
+    : "no";
+}
+
+function readIosBrowser(): string {
+  if (typeof window === "undefined") return "unknown";
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  return isIOS && !isStandalone ? "yes" : "no";
+}
+
 export function NotifikasiContent() {
   const [pushOn, setPushOn] = useState(false);
   const [emailOn, setEmailOn] = useState(true);
-  const [supported, setSupported] = useState(true);
-  const [isIOSBrowser, setIsIOSBrowser] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSupported("Notification" in window && "serviceWorker" in navigator);
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (navigator as unknown as { standalone?: boolean }).standalone === true;
-    setIsIOSBrowser(isIOS && !isStandalone);
-  }, []);
+  const supported =
+    useSyncExternalStore(subscribe, readPushSupport, () => "unknown") === "yes";
+  const isIOSBrowser =
+    useSyncExternalStore(subscribe, readIosBrowser, () => "unknown") === "yes";
 
   async function handlePushToggle(next: boolean) {
     setMessage(null);

@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+const subscribe = () => () => {};
+
+function readFlag(key: string): string {
+  if (typeof window === "undefined") return "false";
+  try {
+    return localStorage.getItem(key) === "true" ? "true" : "false";
+  } catch {
+    return "false";
+  }
+}
 
 const navItems = [
   { href: "/dashboard", label: "Beranda", icon: "pets" },
@@ -24,16 +35,23 @@ const secondaryItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const isBreeder =
+    useSyncExternalStore(
+      subscribe,
+      () => readFlag("cukingpro:isBreeder"),
+      () => "false",
+    ) === "true";
+  const isStudProvider =
+    useSyncExternalStore(
+      subscribe,
+      () => readFlag("cukingpro:isStudProvider"),
+      () => "false",
+    ) === "true";
 
-  useEffect(() => {
-    try {
-      setFlags({
-        "cukingpro:isBreeder": localStorage.getItem("cukingpro:isBreeder") === "true",
-        "cukingpro:isStudProvider": localStorage.getItem("cukingpro:isStudProvider") === "true",
-      });
-    } catch {}
-  }, []);
+  const flags: Record<string, boolean> = {
+    "cukingpro:isBreeder": isBreeder,
+    "cukingpro:isStudProvider": isStudProvider,
+  };
 
   const visibleConditional = conditionalItems.filter((i) => flags[i.key]);
 

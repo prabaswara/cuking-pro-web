@@ -1,21 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+const subscribe = () => () => {};
+
+function readFlag(key: string): string {
+  if (typeof window === "undefined") return "false";
+  try {
+    return localStorage.getItem(key) === "true" ? "true" : "false";
+  } catch {
+    return "false";
+  }
+}
+
 export function BottomNav() {
   const pathname = usePathname();
-  const [isBreeder, setIsBreeder] = useState(false);
-  const [isStudProvider, setIsStudProvider] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    try {
-      setIsBreeder(localStorage.getItem("cukingpro:isBreeder") === "true");
-      setIsStudProvider(localStorage.getItem("cukingpro:isStudProvider") === "true");
-    } catch {}
-  }, []);
+  const isBreeder =
+    useSyncExternalStore(
+      subscribe,
+      () => readFlag("cukingpro:isBreeder"),
+      () => "false",
+    ) === "true";
+  const isStudProvider =
+    useSyncExternalStore(
+      subscribe,
+      () => readFlag("cukingpro:isStudProvider"),
+      () => "false",
+    ) === "true";
 
   const items: { href: string; label: string; icon: string; show: boolean }[] = [
     { href: "/dashboard", label: "Beranda", icon: "pets", show: true },

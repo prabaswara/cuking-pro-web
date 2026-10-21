@@ -17,7 +17,7 @@ interface TambahAnakFormProps {
   sireName: string;
 }
 
-export function TambahAnakForm({ litterId, totalAlive, queenName, sireName }: TambahAnakFormProps) {
+export function TambahAnakForm({ litterId, totalAlive }: TambahAnakFormProps) {
   const router = useRouter();
   const [submittedCount, setSubmittedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);

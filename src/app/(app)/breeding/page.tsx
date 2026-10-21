@@ -1,21 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { HeatCycleList } from "@/components/breeding/heat-cycle-list";
 import { MatingList } from "@/components/breeding/mating-list";
 import { SalesList } from "@/components/penjualan/sales-list";
 
-export default function BreedingPage() {
-  const [isBreeder, setIsBreeder] = useState(false);
-  const [activeTab, setActiveTab] = useState<"birahi" | "kawin" | "penjualan">("birahi");
+const subscribe = () => () => {};
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("cukingpro:isBreeder");
-      setIsBreeder(stored === "true");
-    } catch {}
-  }, []);
+function readFlag(key: string): string {
+  if (typeof window === "undefined") return "false";
+  try {
+    return localStorage.getItem(key) === "true" ? "true" : "false";
+  } catch {
+    return "false";
+  }
+}
+
+export default function BreedingPage() {
+  const [activeTab, setActiveTab] = useState<"birahi" | "kawin" | "penjualan">("birahi");
+  const isBreeder =
+    useSyncExternalStore(
+      subscribe,
+      () => readFlag("cukingpro:isBreeder"),
+      () => "false",
+    ) === "true";
 
   if (!isBreeder) {
     return (
@@ -33,7 +42,7 @@ export default function BreedingPage() {
           </div>
           <h2 className="text-xl font-bold text-on-surface">Fitur Breeding Tersembunyi</h2>
           <p className="mt-2 max-w-md mx-auto text-text-muted">
-            Aktifkan peran "Saya Breeder" di <Link href="/profil" className="text-primary underline">Profil</Link>
+            Aktifkan peran &ldquo;Saya Breeder&rdquo; di <Link href="/profil" className="text-primary underline">Profil</Link>
             untuk mengakses fitur pencatatan birahi, kawin, kehamilan, dan kelahiran.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">

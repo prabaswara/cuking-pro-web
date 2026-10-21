@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { formatRupiah } from "@/lib/mock";
 
 interface JualFormProps {
   cat: { id: string; name: string; breed?: string | null; color?: string | null; birthDate?: string | null };

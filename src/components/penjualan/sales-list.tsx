@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDateID, formatRupiah, getCatSalesForUser } from "@/lib/mock";
 import type { CatSale } from "@/types";
@@ -121,7 +121,6 @@ export function SalesList({ userId }: SalesListProps) {
 
 function SaleCard({ sale, onUpdateStatus, onDelete }: { sale: CatSale; onUpdateStatus: (id: string, status: CatSale["status"]) => void; onDelete: (sale: CatSale) => void }) {
   const style = STATUS_STYLE[sale.status];
-  const isActive = sale.status === "listed" || sale.status === "reserved";
 
   return (
     <Card className="rounded-3xl border-sand-border shadow-warm-sm">

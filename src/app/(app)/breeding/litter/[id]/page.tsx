@@ -2,9 +2,8 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getLitterByMating, mockLitters, getCatName } from "@/lib/mock";
+import { mockLitters } from "@/lib/mock";
 import { formatDateID } from "@/lib/mock";
-import type { Litter } from "@/types";
 
 interface LitterPageProps {
   params: Promise<{ id: string }>;

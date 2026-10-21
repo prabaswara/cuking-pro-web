@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDateID, getMatingsForUser, getQueenDisplayName, getSireDisplayName, getLitterByMating, getCatName } from "@/lib/mock";
+import { formatDateID, getMatingsForUser, getQueenDisplayName, getSireDisplayName, getLitterByMating, mockCats } from "@/lib/mock";
 import type { Mating } from "@/types";
 
 const OUTCOME_STYLE: Record<Mating["outcome"], { bg: string; text: string; label: string }> = {
@@ -176,9 +176,12 @@ function MatingForm({ onClose }: MatingFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Mock cats for selection (female for queen, male for sire)
-  const { mockCats } = require("@/lib/mock");
-  const females = mockCats.filter((c: any) => c.sex === "female" && c.status === "active" && c.trackingStatus === "tracked");
-  const males = mockCats.filter((c: any) => c.sex === "male" && c.status === "active" && c.trackingStatus === "tracked");
+  const females = mockCats.filter(
+    (c) => c.sex === "female" && c.status === "active" && c.trackingStatus === "tracked",
+  );
+  const males = mockCats.filter(
+    (c) => c.sex === "male" && c.status === "active" && c.trackingStatus === "tracked",
+  );
 
   function todayStr() {
     const t = new Date();
@@ -236,7 +239,7 @@ function MatingForm({ onClose }: MatingFormProps) {
                 className="w-full h-12 rounded-2xl border-sand-border px-4"
               >
                 <option value="">Pilih betina</option>
-                {females.map((c: any) => (
+                {females.map((c) => (
                   <option key={c.id} value={c.id}>{c.name} ({c.breed})</option>
                 ))}
               </select>
@@ -280,7 +283,7 @@ function MatingForm({ onClose }: MatingFormProps) {
                 className="w-full h-12 rounded-2xl border-sand-border px-4"
               >
                 <option value="">Pilih pejantan</option>
-                {males.map((c: any) => (
+                {males.map((c) => (
                   <option key={c.id} value={c.id}>{c.name} ({c.breed})</option>
                 ))}
               </select>

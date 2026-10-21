@@ -28,6 +28,22 @@ Format: **Tanggal — Keputusan** (alasan → dampak)
 - **Estimasi lahir = kawin + 65 hari** (dari PRD `[ASUMSI]`) → default
   di UI kehamilan, bisa diubah manual.
 
+## 2026-10-21
+- **Dokumen & Timeline jadi sub-route profil kucing** (`/kucing/[id]/dokumen`,
+  `/kucing/[id]/timeline`) mengikuti tab yang sudah ada → konsisten dengan
+  pola navigasi & desain stitch, tidak membuat satu halaman tab raksasa.
+- **Onboarding peran di `/onboarding` + banner Beranda** → alur "Kamu siapa?"
+  dari PRD terwujud tanpa menunggu auth; status disimpan di localStorage
+  (`cukingpro:onboarded`) dan nanti dipindah ke profil DB.
+- **Baca state eksternal (localStorage/navigator) pakai `useSyncExternalStore`**
+  (bukan `setState` di `useEffect`) → lolos `react-hooks/set-state-in-effect`
+  di Next 16 dan menghindari cascading render.
+- **Halaman legal di route group `(marketing)`** (`/kebijakan-privasi`,
+  `/syarat-layanan`) → punya layout publik sendiri, tidak memakai nav aplikasi.
+- **Font ikon Material Symbols tetap `<link>` dengan `&display=swap`** dan
+  rule `no-page-custom-font` di-disable untuk baris itu → `next/font` tidak
+  cocok untuk icon-font dengan ligatur.
+
 ## Template entri baru
 ```
 ## YYYY-MM-DD

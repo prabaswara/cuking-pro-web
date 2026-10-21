@@ -99,6 +99,20 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-sand-border px-6 py-6 text-center">
+        <div className="mb-3 flex items-center justify-center gap-4 text-sm">
+          <Link
+            href="/kebijakan-privasi"
+            className="font-medium text-primary hover:underline"
+          >
+            Kebijakan Privasi
+          </Link>
+          <Link
+            href="/syarat-layanan"
+            className="font-medium text-primary hover:underline"
+          >
+            Syarat Layanan
+          </Link>
+        </div>
         <p className="text-sm text-text-muted">
           © 2026 cukingPro. Aplikasi manajemen kucing untuk breeder dan pemilik
           kucing.
