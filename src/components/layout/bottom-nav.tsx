@@ -1,36 +1,17 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const subscribe = () => () => {};
+type BottomNavProps = {
+  isBreeder: boolean;
+  isStudProvider: boolean;
+};
 
-function readFlag(key: string): string {
-  if (typeof window === "undefined") return "false";
-  try {
-    return localStorage.getItem(key) === "true" ? "true" : "false";
-  } catch {
-    return "false";
-  }
-}
-
-export function BottomNav() {
+export function BottomNav({ isBreeder, isStudProvider }: BottomNavProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const isBreeder =
-    useSyncExternalStore(
-      subscribe,
-      () => readFlag("cukingpro:isBreeder"),
-      () => "false",
-    ) === "true";
-  const isStudProvider =
-    useSyncExternalStore(
-      subscribe,
-      () => readFlag("cukingpro:isStudProvider"),
-      () => "false",
-    ) === "true";
 
   const items: { href: string; label: string; icon: string; show: boolean }[] = [
     { href: "/dashboard", label: "Beranda", icon: "pets", show: true },

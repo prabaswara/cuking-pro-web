@@ -28,11 +28,42 @@ createdb cukingpro
 # 4. Jalankan migrasi
 npm run db:migrate
 
-# 5. Jalankan dev server
+# 5. Isi data demo (opsional, untuk mencoba berbagai role/paket)
+npm run db:seed
+
+# 6. Jalankan dev server
 npm run dev
 ```
 
 Buka http://localhost:3000.
+
+### Akun demo
+
+`npm run db:seed` membuat 4 akun (password sama: lihat `DEMO_PASSWORD`
+di `.env`, default `demo12345`):
+
+| Email | Peran | Paket |
+|---|---|---|
+| `free@demo.cukingpro` | pemilik | Free (2 kucing) |
+| `breeder@demo.cukingpro` | breeder | Free |
+| `stud@demo.cukingpro` | jasa pacak | Free |
+| `pro@demo.cukingpro` | breeder + jasa pacak | Pro |
+
+Pemilih akun di `/login` **hanya tampil bila `DEMO_MODE="true"`**.
+Jangan aktifkan di produksi; akun demo tidak dibuat otomatis.
+
+### Tes
+
+```bash
+# sekali saja: buat database tes + migrasi (butuh .env.test)
+cp .env.example .env.test   # lalu isi DATABASE_URL ke database terpisah
+npm run db:test:setup
+
+npm test                    # Vitest: unit + integrasi (PostgreSQL)
+```
+
+Tes integrasi memakai database sungguhan dan membersihkan datanya sendiri.
+Jangan arahkan `.env.test` ke database pengembangan/produksi.
 
 ## Perintah
 
@@ -43,8 +74,12 @@ Buka http://localhost:3000.
 | `npm run start` | Jalankan hasil build |
 | `npm run lint` | ESLint |
 | `npx tsc --noEmit` | Cek TypeScript |
+| `npm test` | Jalankan seluruh tes (Vitest) |
+| `npm run test:watch` | Tes mode watch |
 | `npm run db:generate` | Generate migrasi dari `src/db/schema.ts` |
 | `npm run db:migrate` | Terapkan migrasi ke database |
+| `npm run db:seed` | Isi akun & data demo (idempoten) |
+| `npm run db:test:setup` | Buat database tes + migrasi |
 | `npm run db:studio` | Drizzle Studio |
 
 ## Struktur Singkat
@@ -54,13 +89,19 @@ src/
 ├── app/
 │   ├── (marketing)/   # landing, kebijakan privasi, syarat layanan
 │   ├── (auth)/        # login, register, verify-email, lupa/reset password
-│   ├── (app)/         # area aplikasi (Header, Sidebar, BottomNav)
+│   ├── (app)/         # area aplikasi (auth guard, Header, Sidebar, BottomNav)
 │   └── api/
 │       ├── auth/[...all]/   # handler Better Auth
-│       └── health-check/    # GET /api/health-check → { ok: true }
+│       ├── health-check/    # GET /api/health-check → { ok: true }
+│       ├── profile/         # GET/PATCH profil + peran
+│       ├── plan/            # GET paket, pemakaian, jendela riwayat
+│       ├── cats/            # CRUD kucing + tracking + pedigree
+│       └── uploads/         # POST foto, GET foto (wajib sesi)
 ├── components/        # UI per domain
-├── db/                # koneksi Drizzle + skema
-└── lib/               # auth, session, api-error, email, mock
+├── db/                # koneksi Drizzle, skema, seed
+├── lib/               # auth, session, cats, plan, storage, api-error, mock
+└── proxy.ts           # cek cookie sesi → redirect 307 ke /login
+tests/                 # Vitest (unit + integrasi DB)
 ```
 
 ## Auth (Better Auth)
@@ -73,5 +114,11 @@ src/
 
 ## Catatan
 
-- `src/lib/mock.ts` masih menjadi sumber data UI untuk modul non-auth.
+- Data domain yang belum punya API (kesehatan, berat, breeding, penjualan,
+  jasa pacak, transfer, keuangan) masih dari `src/lib/mock.ts`.
+- Foto kucing disimpan di `.data/uploads/` (gitignored) dan hanya bisa
+  diakses lewat `/api/uploads/:key` dengan sesi valid. Ganti ke S3/R2
+  cukup dengan implementasi driver baru di `src/lib/storage.ts`.
+- Harga & durasi Pro masih placeholder di seed (`plans`), menunggu
+  keputusan pemilik produk.
 - `.env` tidak boleh di-commit; gunakan `.env.example` sebagai acuan.

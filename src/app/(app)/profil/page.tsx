@@ -1,7 +1,21 @@
+import { connection } from "next/server";
+import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/profil/profile-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAccount, getOrCreateProfile } from "@/lib/profile";
+import { getSession } from "@/lib/session";
 
-export default function ProfilPage() {
+export default async function ProfilPage() {
+  await connection();
+
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const [account, profile] = await Promise.all([
+    getAccount(session.user.id),
+    getOrCreateProfile(session.user.id),
+  ]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -11,7 +25,15 @@ export default function ProfilPage() {
         </p>
       </div>
 
-      <ProfileForm />
+      <ProfileForm
+        user={{ name: account.name, email: account.email }}
+        profile={{
+          whatsapp: profile.whatsapp,
+          kennelName: profile.kennelName,
+          isBreeder: profile.isBreeder,
+          isStudProvider: profile.isStudProvider,
+        }}
+      />
 
       {/* Danger Zone */}
       <Card className="rounded-3xl border-error/20 shadow-warm-sm">
@@ -30,9 +52,10 @@ export default function ProfilPage() {
             </p>
             <button
               type="button"
-              className="mt-3 rounded-full bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              disabled
+              className="mt-3 rounded-full bg-error px-4 py-2 text-sm font-semibold text-white opacity-60"
             >
-              Hapus Akun
+              Hapus Akun (segera hadir)
             </button>
           </div>
         </CardContent>

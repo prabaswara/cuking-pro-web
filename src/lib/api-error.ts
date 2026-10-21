@@ -60,8 +60,28 @@ export function errorResponse(
   );
 }
 
+function isPrerenderBailout(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("digest" in error)) {
+    return false;
+  }
+
+  const digest = (error as { digest?: unknown }).digest;
+
+  return (
+    digest === "HANGING_PROMISE_REJECTION" ||
+    digest === "NEXT_PRERENDER_INTERRUPTED" ||
+    digest === "DYNAMIC_SERVER_USAGE"
+  );
+}
+
 /** Ubah error apa pun menjadi response standar. */
 export function handleRouteError(error: unknown) {
+  // Saat build, Next memakai error khusus untuk membatalkan prerender.
+  // Jangan ditelan sebagai 500 — teruskan agar route tetap dinamis.
+  if (isPrerenderBailout(error)) {
+    throw error;
+  }
+
   if (error instanceof ApiError) {
     return errorResponse(error.code, error.message, {
       status: error.status,

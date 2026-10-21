@@ -88,7 +88,21 @@ export function historyWindowStart(
   if (months === null) return null;
 
   const start = new Date(now);
+  const day = start.getDate();
+
+  // Mundur ke tanggal 1 dulu supaya tidak "meluber" (31 Mei - 3 bulan
+  // tidak boleh jadi 3 Maret), lalu kembalikan tanggal dengan clamp
+  // ke akhir bulan tujuan.
+  start.setDate(1);
   start.setMonth(start.getMonth() - months);
+
+  const lastDay = new Date(
+    start.getFullYear(),
+    start.getMonth() + 1,
+    0,
+  ).getDate();
+
+  start.setDate(Math.min(day, lastDay));
   return start;
 }
 

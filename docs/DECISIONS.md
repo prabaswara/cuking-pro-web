@@ -74,6 +74,37 @@ Format: **Tanggal — Keputusan** (alasan → dampak)
 - **`.gitignore` dikecualikan untuk `.env.example`** (`!.env.example`)
   → contoh env tetap bisa di-commit, `.env` tetap aman.
 
+## 2026-10-21 (Fase 1)
+- **Foto disimpan di disk lokal di balik antarmuka `storage.ts`**, bukan
+  `public/` → PRD mewajibkan akses berotorisasi; berkas dilayani lewat
+  `/api/uploads/:key` yang memeriksa sesi. S3/R2 cukup menambah driver.
+- **Aturan paket hanya di `src/lib/plan.ts`** (batas 2 kucing aktif,
+  riwayat 3 bulan kalender, rekonsiliasi beku) → route & komponen tidak
+  boleh hardcode angka; perubahan aturan satu titik.
+- **Kucing kelebihan dibekukan, bukan dihapus**; Free tidak bisa menambah
+  kucing aktif ke-3 (`PLAN_CAT_LIMIT`), Pro mengaktifkan kembali semua
+  kucing beku. Data tetap utuh saat paket berakhir.
+- **Data milik pengguna lain selalu 404**, bukan 403 → tidak membocorkan
+  keberadaan data; semua akses lewat lapisan owner-scoped `src/lib/cats.ts`.
+- **Akun demo dibuat lewat Better Auth (`auth.api.signUpEmail`) dalam
+  seed**, bukan insert tabel auth manual → hash password benar; pemilih
+  akun hanya dirender bila `DEMO_MODE="true"` di server.
+- **Peran pengguna dibaca dari DB dan dioper sebagai props** ke
+  Sidebar/BottomNav → tidak ada lagi gating `localStorage`; penanda
+  `cukingpro:onboarded` hanya untuk banner.
+- **Tes memakai Vitest + PostgreSQL sungguhan** (database `cukingpro_test`)
+  dan menguji lapisan data, bukan route handler → isolasi antar pemilik
+  dan batas paket teruji tanpa perlu mensimulasikan request Next.
+- **`src/proxy.ts` melakukan cek cookie sesi** → pengguna anonim dapat
+  redirect HTTP 307; validasi sesi sebenarnya tetap di layout via Better
+  Auth (cookie bisa dipalsukan).
+- **`export const instant = false` pada layout `(app)` + `connection()`
+  di `getSession()`** → route yang butuh sesi boleh blocking dan tidak
+  ikut diprerender; error bail-out prerender diteruskan ulang oleh
+  `handleRouteError` agar tidak tercatat sebagai 500.
+- **Harga & durasi Pro placeholder (`49000` / 30 hari)** di seed →
+  menunggu keputusan pemilik produk; UI membaca nilai dari tabel `plans`.
+
 ## Template entri baru
 ```
 ## YYYY-MM-DD

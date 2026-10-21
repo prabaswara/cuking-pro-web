@@ -1,19 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const subscribe = () => () => {};
-
-function readFlag(key: string): string {
-  if (typeof window === "undefined") return "false";
-  try {
-    return localStorage.getItem(key) === "true" ? "true" : "false";
-  } catch {
-    return "false";
-  }
-}
 
 const navItems = [
   { href: "/dashboard", label: "Beranda", icon: "pets" },
@@ -24,8 +12,8 @@ const navItems = [
 ];
 
 const conditionalItems = [
-  { href: "/breeding", label: "Breeding", icon: "favorite", key: "cukingpro:isBreeder" },
-  { href: "/jasa-pacak", label: "Jasa Pacak", icon: "cruelty_free", key: "cukingpro:isStudProvider" },
+  { href: "/breeding", label: "Breeding", icon: "favorite", role: "breeder" },
+  { href: "/jasa-pacak", label: "Jasa Pacak", icon: "cruelty_free", role: "stud" },
 ];
 
 const secondaryItems = [
@@ -33,27 +21,27 @@ const secondaryItems = [
   { href: "/riwayat-kepemilikan", label: "Riwayat Kepemilikan", icon: "history" },
 ];
 
-export function Sidebar() {
+type SidebarProps = {
+  isBreeder: boolean;
+  isStudProvider: boolean;
+  userName: string;
+  userEmail: string;
+};
+
+export function Sidebar({
+  isBreeder,
+  isStudProvider,
+  userName,
+  userEmail,
+}: SidebarProps) {
   const pathname = usePathname();
-  const isBreeder =
-    useSyncExternalStore(
-      subscribe,
-      () => readFlag("cukingpro:isBreeder"),
-      () => "false",
-    ) === "true";
-  const isStudProvider =
-    useSyncExternalStore(
-      subscribe,
-      () => readFlag("cukingpro:isStudProvider"),
-      () => "false",
-    ) === "true";
 
   const flags: Record<string, boolean> = {
-    "cukingpro:isBreeder": isBreeder,
-    "cukingpro:isStudProvider": isStudProvider,
+    breeder: isBreeder,
+    stud: isStudProvider,
   };
 
-  const visibleConditional = conditionalItems.filter((i) => flags[i.key]);
+  const visibleConditional = conditionalItems.filter((i) => flags[i.role]);
 
   return (
     <aside className="fixed bottom-0 left-0 top-0 z-40 hidden w-64 flex-col border-r border-sand-border bg-surface-card pt-16 md:flex">
@@ -130,8 +118,8 @@ export function Sidebar() {
             </div>
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-on-surface">Pengguna</p>
-            <p className="text-sm text-text-muted">user@example.com</p>
+            <p className="truncate font-semibold text-on-surface">{userName}</p>
+            <p className="truncate text-sm text-text-muted">{userEmail}</p>
           </div>
         </div>
       </div>

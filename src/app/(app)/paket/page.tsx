@@ -1,7 +1,14 @@
+import { connection } from "next/server";
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UpgradeButton } from "@/components/paket/upgrade-button";
+import { db } from "@/db";
+import { plans } from "@/db/schema";
+import { countActiveCats, countTrackedCats, getPlanInfo } from "@/lib/plan";
+import { getSession } from "@/lib/session";
 import { formatDateID, formatRupiah } from "@/lib/mock";
 
 const mockPayments = [
@@ -21,7 +28,22 @@ const mockPayments = [
   },
 ];
 
-export default function PaketPage() {
+export default async function PaketPage() {
+  await connection();
+
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const [plan, activeCats, trackedCats, proPlan] = await Promise.all([
+    getPlanInfo(session.user.id),
+    countActiveCats(session.user.id),
+    countTrackedCats(session.user.id),
+    db.select().from(plans).where(eq(plans.code, "pro")).limit(1),
+  ]);
+
+  const pro = proPlan[0];
+  const alreadyPro = plan.isPro;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -40,10 +62,22 @@ export default function PaketPage() {
         <CardContent>
           <div className="flex items-center justify-between rounded-2xl bg-mint-subtle p-4">
             <div>
-              <p className="font-semibold text-secondary">Paket Free</p>
+              <p className="font-semibold text-secondary">Paket {plan.name}</p>
               <p className="text-sm text-secondary/80">
-                2 kucing dilacak • Riwayat 3 bulan
+                {trackedCats}
+                {plan.limits.maxTrackedCats !== null
+                  ? ` dari ${plan.limits.maxTrackedCats}`
+                  : ""}{" "}
+                kucing dilacak ({activeCats} aktif) • Riwayat{" "}
+                {plan.limits.historyMonths !== null
+                  ? `${plan.limits.historyMonths} bulan`
+                  : "tanpa batas"}
               </p>
+              {plan.endsAt && (
+                <p className="mt-1 text-xs text-secondary/80">
+                  Aktif sampai {formatDateID(plan.endsAt)}
+                </p>
+              )}
             </div>
             <Badge className="rounded-full bg-secondary text-white">Aktif</Badge>
           </div>
@@ -112,7 +146,7 @@ export default function PaketPage() {
               className="w-full rounded-full"
               variant="outline"
             >
-              Paket Saat Ini
+              {alreadyPro ? "Turun ke Free belum tersedia" : "Paket Saat Ini"}
             </Button>
           </CardContent>
         </Card>
@@ -132,8 +166,12 @@ export default function PaketPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-on-surface">Rp 99.000</span>
-              <span className="text-text-muted">/bulan</span>
+              <span className="text-3xl font-bold text-on-surface">
+                {pro ? formatRupiah(pro.priceIdr) : "-"}
+              </span>
+              <span className="text-text-muted">
+                /{pro?.durationDays ?? 30} hari
+              </span>
             </div>
 
             <ul className="space-y-3">
@@ -195,7 +233,13 @@ export default function PaketPage() {
               </li>
             </ul>
 
-            <UpgradeButton />
+            {alreadyPro ? (
+              <Button disabled className="w-full rounded-full" variant="outline">
+                Paket Saat Ini
+              </Button>
+            ) : (
+              <UpgradeButton />
+            )}
           </CardContent>
         </Card>
       </div>

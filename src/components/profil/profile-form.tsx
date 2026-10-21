@@ -1,39 +1,69 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 
-export function ProfileForm() {
+type ProfileFormProps = {
+  user: { name: string; email: string };
+  profile: {
+    whatsapp: string | null;
+    kennelName: string | null;
+    isBreeder: boolean;
+    isStudProvider: boolean;
+  };
+};
+
+export function ProfileForm({ user, profile }: ProfileFormProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isBreeder, setIsBreeder] = useState(false);
-  const [isStudProvider, setIsStudProvider] = useState(false);
-
-  function updateBreeder(val: boolean) {
-    setIsBreeder(val);
-    try {
-      localStorage.setItem("cukingpro:isBreeder", String(val));
-    } catch {}
-  }
-
-  function updateStudProvider(val: boolean) {
-    setIsStudProvider(val);
-    try {
-      localStorage.setItem("cukingpro:isStudProvider", String(val));
-    } catch {}
-  }
+  const [isBreeder, setIsBreeder] = useState(profile.isBreeder);
+  const [isStudProvider, setIsStudProvider] = useState(profile.isStudProvider);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsLoading(true);
+    setError(null);
+    setSuccess(false);
 
-    // TODO: Implement profile update
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
+    const whatsapp = String(formData.get("whatsapp") ?? "").trim();
+    const kennelName = String(formData.get("kennelName") ?? "").trim();
 
-    setIsLoading(false);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          whatsapp: whatsapp || null,
+          kennelName: kennelName || null,
+          isBreeder,
+          isStudProvider,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error?.message ?? "Gagal menyimpan profil");
+        return;
+      }
+
+      setSuccess(true);
+      router.refresh();
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -61,14 +91,27 @@ export function ProfileForm() {
                 variant="outline"
                 size="sm"
                 className="rounded-full"
+                disabled
               >
-                Ubah Foto
+                Unggah Foto
               </Button>
               <p className="mt-1 text-xs text-text-muted">
-                JPG atau PNG, maks. 5MB
+                JPG, PNG, atau WebP, maks. 5MB (segera hadir)
               </p>
             </div>
           </div>
+
+          {error && (
+            <div className="rounded-2xl bg-error-container p-4 text-sm text-error">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="rounded-2xl bg-mint-subtle p-4 text-sm text-secondary">
+              Profil berhasil disimpan.
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="name">Nama Lengkap</Label>
@@ -77,7 +120,8 @@ export function ProfileForm() {
               name="name"
               type="text"
               placeholder="Nama kamu"
-              defaultValue="Pengguna"
+              defaultValue={user.name}
+              required
               className="h-12 rounded-2xl border-sand-border"
             />
           </div>
@@ -88,8 +132,7 @@ export function ProfileForm() {
               id="email"
               name="email"
               type="email"
-              placeholder="nama@email.com"
-              defaultValue="user@example.com"
+              defaultValue={user.email}
               disabled
               className="h-12 rounded-2xl border-sand-border bg-surface-container-low"
             />
@@ -105,6 +148,7 @@ export function ProfileForm() {
               name="whatsapp"
               type="tel"
               placeholder="08xxxxxxxxxx"
+              defaultValue={profile.whatsapp ?? ""}
               className="h-12 rounded-2xl border-sand-border"
             />
             <p className="text-xs text-text-muted">
@@ -119,6 +163,7 @@ export function ProfileForm() {
               name="kennelName"
               type="text"
               placeholder="Nama kennel atau cattery kamu"
+              defaultValue={profile.kennelName ?? ""}
               className="h-12 rounded-2xl border-sand-border"
             />
             <p className="text-xs text-text-muted">
@@ -140,7 +185,7 @@ export function ProfileForm() {
               <Switch
                 id="is-breeder"
                 checked={isBreeder}
-                onCheckedChange={updateBreeder}
+                onCheckedChange={setIsBreeder}
               />
             </div>
 
@@ -154,7 +199,7 @@ export function ProfileForm() {
               <Switch
                 id="is-stud-provider"
                 checked={isStudProvider}
-                onCheckedChange={updateStudProvider}
+                onCheckedChange={setIsStudProvider}
               />
             </div>
           </div>

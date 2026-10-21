@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +11,59 @@ import { GenderSelect } from "@/components/kucing/gender-select";
 import Link from "next/link";
 
 export default function TambahKucingPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const sex = String(formData.get("sex") ?? "");
+
+    if (!sex) {
+      setError("Pilih jenis kelamin kucing.");
+      return;
+    }
+
+    const text = (key: string) => {
+      const value = String(formData.get(key) ?? "").trim();
+      return value || null;
+    };
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/cats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(formData.get("name") ?? "").trim(),
+          sex,
+          breed: text("breed"),
+          color: text("color"),
+          birthDate: text("birthDate"),
+          notes: text("notes"),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error?.message ?? "Gagal menyimpan kucing.");
+        return;
+      }
+
+      router.push("/kucing");
+      router.refresh();
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-lg space-y-6">
       {/* Header */}
@@ -28,7 +85,13 @@ export default function TambahKucingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-2xl bg-error-container p-4 text-sm text-error">
+                {error}
+              </div>
+            )}
+
             {/* Photo Upload */}
             <div className="flex flex-col items-center">
               <div className="flex h-32 w-32 items-center justify-center rounded-full bg-warm-cream">
@@ -85,27 +148,24 @@ export default function TambahKucingPage() {
 
             {/* Ras */}
             <div className="space-y-2">
-              <Label htmlFor="breed">
-                Ras Kucing <span className="text-primary">*</span>
-              </Label>
+              <Label htmlFor="breed">Ras Kucing</Label>
               <select
                 id="breed"
                 name="breed"
-                required
                 className="h-12 w-full rounded-2xl border-sand-border bg-surface-card px-4 text-on-surface"
               >
                 <option value="">Pilih ras anabul...</option>
-                <option value="domestik">Domestik / Kucing Kampung</option>
-                <option value="british_shorthair">British Shorthair</option>
-                <option value="persia">Persia</option>
-                <option value="maine_coon">Maine Coon</option>
-                <option value="ragdoll">Ragdoll</option>
-                <option value="scottish_fold">Scottish Fold</option>
-                <option value="bengal">Bengal</option>
-                <option value="siamese">Siamese</option>
-                <option value="sphynx">Sphynx</option>
-                <option value="mix">Campuran / Mix Breed</option>
-                <option value="lainnya">Lainnya</option>
+                <option value="Domestik / Kucing Kampung">Domestik / Kucing Kampung</option>
+                <option value="British Shorthair">British Shorthair</option>
+                <option value="Persia">Persia</option>
+                <option value="Maine Coon">Maine Coon</option>
+                <option value="Ragdoll">Ragdoll</option>
+                <option value="Scottish Fold">Scottish Fold</option>
+                <option value="Bengal">Bengal</option>
+                <option value="Siamese">Siamese</option>
+                <option value="Sphynx">Sphynx</option>
+                <option value="Campuran / Mix Breed">Campuran / Mix Breed</option>
+                <option value="Lainnya">Lainnya</option>
               </select>
             </div>
 
@@ -137,9 +197,10 @@ export default function TambahKucingPage() {
             <div className="flex flex-col gap-3 pt-4">
               <Button
                 type="submit"
+                disabled={isLoading}
                 className="h-14 w-full rounded-full text-base font-semibold"
               >
-                Simpan & Lanjut ke Dashboard
+                {isLoading ? "Menyimpan..." : "Simpan & Lanjut ke Daftar Kucing"}
               </Button>
               <Link href="/kucing" className="w-full">
                 <Button

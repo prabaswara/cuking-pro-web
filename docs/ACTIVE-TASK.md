@@ -1,73 +1,89 @@
 # Active Task
 
 ## Status Terakhir
-**Backend Fase 0 SELESAI** — Drizzle + PostgreSQL, migrasi, Better Auth
-(email/password + verifikasi email), format error standar, `/api/health-check`,
-dan form auth di frontend sudah memakai Better Auth (bukan endpoint dummy).
-UI Fase 1–6 tetap berjalan dengan mock.
+**Backend Fase 1 SELESAI** — profil, paket, kucing, silsilah, upload foto,
+auth guard, akun demo, dan tes otomatis.
 
-Build hijau, TypeScript bersih, ESLint 0 error / 0 warning.
+- Build produksi hijau, `npx tsc --noEmit` bersih, ESLint 0 error.
+- `npm test` → **12 tes lulus** (unit + integrasi PostgreSQL).
+- Data kucing/profil/paket sudah dari DB. Modul lain (kesehatan, berat,
+  breeding, penjualan, jasa pacak, transfer, keuangan) masih mock.
 
-## Progres Sesi Ini (21 Okt 2026)
-- Menambahkan dependensi: `drizzle-orm`, `drizzle-kit`, `postgres`,
-  `better-auth`, `zod`, `tsx`, `dotenv`.
-- `src/db/schema.ts` — tabel auth resmi Better Auth (`user`, `session`,
-  `account`, `verification`) + relasi. Migrasi: `drizzle/0000_*.sql`.
-- `src/db/index.ts` — Drizzle + postgres-js, singleton saat dev.
-- `drizzle.config.ts` + skrip `db:generate`, `db:migrate`, `db:studio`.
-- `src/lib/auth.ts` — Better Auth + Drizzle adapter, `requireEmailVerification`,
-  `minPasswordLength: 8`, plugin `nextCookies()`, stub email.
-- `src/lib/email.ts` — stub email: tautan hanya ditulis ke log (dev).
-- `src/lib/session.ts` — `getSession()` / `requireSession()`.
-- `src/lib/api-error.ts` — `ApiError` + `handleRouteError` sesuai format PRD §11.
-- `src/app/api/auth/[...all]/route.ts` + `src/app/api/health-check/route.ts`.
-- Form auth disesuaikan ke Better Auth: login (termasuk "Kirim ulang"
-  verifikasi), register, lupa password, halaman `/reset-password` baru,
-  kirim ulang di `/verify-email`, dan tombol Keluar di `/pengaturan`.
-- `.env.example`, `.env` lokal (gitignored), README setup, `.gitignore`
-  dikecualikan untuk `.env.example`.
-- `next.config.ts`: `turbopack.root` dikunci ke folder proyek (menghapus
-  warning package-lock liar di home directory).
-- Halaman `/verify-email` & `/reset-password` membungkus akses `searchParams`
-  dengan `<Suspense>` (wajib di Next 16 + cacheComponents).
+## Yang Selesai di Fase 1 (21 Okt 2026)
 
-## Hasil Verifikasi
-- `npx tsc --noEmit` → bersih
-- `npx eslint src` → 0 error, 0 warning
-- `npm run db:migrate` → 4 tabel dibuat (`user`, `session`, `account`,
-  `verification`)
-- `npm run build` → sukses
-- Uji API (dev & production build):
-  - `GET /api/health-check` → `200 {"ok":true}`
-  - sign-up → 200, email verifikasi tercatat di log
-  - login sebelum verifikasi → `403 EMAIL_NOT_VERIFIED`
-  - buka tautan verifikasi → 302 ke `/`
-  - login setelah verifikasi → 200 + sesi valid (`get-session`)
-  - request reset password → 200; reset dengan token → 200; login password
-    baru → 200
-- Halaman `/login`, `/register`, `/verify-email`, `/reset-password`,
-  `/pengaturan` → 200 (dev & production)
+### Skema & aturan paket
+- Tabel baru: `profiles`, `cats`, `cat_ownership_history`, `plans`,
+  `subscriptions` (migrasi `drizzle/0001_windy_cargill.sql`).
+- Indeks unik parsial menjamin satu kepemilikan aktif per kucing.
+- Induk (`sire_id`/`dam_id`) hanya boleh kucing milik pemilik yang sama —
+  dijaga di lapisan API (tidak ada FK lintas pemilik).
+- `src/lib/plan.ts`: satu sumber aturan Free/Pro, jendela riwayat 3 bulan
+  kalender (dengan clamp akhir bulan), hitung kucing, rekonsiliasi status beku.
+
+### API
+- `GET/PATCH /api/profile` — profil + peran + nama.
+- `GET /api/plan` — paket aktif, pemakaian, awal jendela riwayat.
+- `GET/POST /api/cats`, `GET/PATCH/DELETE /api/cats/:id`.
+- `PATCH /api/cats/:id/tracking`, `GET /api/cats/:id/pedigree`.
+- `POST /api/uploads`, `GET /api/uploads/:key` (wajib sesi).
+- Semua query memfilter `owner_id` dari sesi; data pemilik lain → 404.
+- Kucing beku menolak edit (`403 CAT_FROZEN`), kecuali ubah status.
+- Paket Free menolak kucing aktif ke-3 (`403 PLAN_CAT_LIMIT`).
+
+### Auth & demo
+- Auth guard di `(app)/layout.tsx` + `src/proxy.ts` (cookie check → 307).
+- Pemilih 4 akun demo di `/login`, hanya bila `DEMO_MODE="true"`.
+- Peran diambil dari DB dan diteruskan ke Sidebar/BottomNav (bukan
+  `localStorage` lagi).
+- Onboarding & form profil menyimpan peran lewat `PATCH /api/profile`.
+
+### UI tersambung
+- `/kucing` menampilkan kucing dari DB; `/kucing/tambah` menyimpan via API.
+- `/profil` memuat & menyimpan profil DB.
+- `/paket` menampilkan paket, pemakaian, dan harga dari DB.
+
+### Tes
+- `vitest.config.mts`, `vitest.setup.ts`, `tests/plan.test.ts`,
+  `tests/cats.test.ts`.
+- Integrasi memakai database `cukingpro_test` dan membersihkan datanya.
+
+## Hasil Verifikasi (production build)
+- `npm run build` → sukses, tanpa error prerender.
+- Tanpa sesi: `/dashboard`, `/kucing/abc` → **307** ke `/login`.
+- Login `free@demo.cukingpro` → `/dashboard`, `/kucing`, `/profil`,
+  `/paket`, `/onboarding` → 200; kucing Mochi & Luna tampil.
+- Free: POST kucing ke-3 → `403 PLAN_CAT_LIMIT`.
+- Pro: POST kucing ke-4 → 201; `/paket` menampilkan "tanpa batas".
+- Isolasi: GET/PATCH/DELETE kucing milik Pro oleh Free → 404.
+- Kucing beku: PATCH nama → `403 CAT_FROZEN`.
+- Upload PNG 1×1 → WebP 96 byte; GET dengan sesi 200, tanpa sesi 401.
+- PATCH peran breeder → menu Jasa Pacak langsung muncul setelah refresh.
 
 ## Masalah yang Belum Selesai (diketahui)
-1. Modul selain auth masih memakai `src/lib/mock.ts`.
-2. Belum ada auth guard di `(app)/layout.tsx` (bypass demo masih ada).
-3. Pengiriman email nyata belum ada (SMTP stub).
-4. Upload foto/dokumen, Web Push, Midtrans belum ada.
-5. Logout belum menghapus langganan Web Push (TODO FR-21).
+1. Harga & durasi Pro masih placeholder (`49000` / 30 hari).
+2. Belum ada SMTP nyata; tautan verifikasi/reset hanya ke log (dev).
+3. Modul kesehatan/berat/breeding/penjualan/jasa pacak/transfer/keuangan
+   masih mock; tabelnya menyusul di fase terkait.
+4. `litter_id` pada `cats` dan `transfer_id` pada riwayat kepemilikan
+   ditunda sampai tabel Fase 3/5 ada.
+5. Upload avatar profil belum disambungkan (tombol masih disabled).
+6. Midtrans & cron job belum ada (Fase 6).
+7. Logout belum menghapus langganan Web Push (TODO FR-21).
 
-## Langkah Berikutnya
-A. **Fase 1**: skema `profiles`, `cats`, `cat_ownership_history` + modul
-   `plan.ts` + auth guard `(app)` (paling logis setelah Fase 0).
-B. Sambungkan modul kucing & kesehatan ke API.
-C. Tambah `profiles` + ganti gating peran dari `localStorage` ke DB.
+## Langkah Berikutnya (Fase 2)
+A. Tabel kesehatan, berat, pakan, pengingat, dokumen + API owner-scoped.
+B. Terapkan jendela riwayat Free (banner "N data terkunci").
+C. Sambungkan halaman `/kucing/[id]/kesehatan`, `/berat`, `/pakan`,
+   `/dokumen`, `/timeline` ke API.
+D. Update `docs/AI-CONTEXT.md` tiap akhir sesi.
 
-## File Penting yang Diubah Sesi Ini
-- Baru: `drizzle.config.ts`, `drizzle/`, `.env.example`,
-  `src/db/{index,schema}.ts`, `src/lib/{auth,auth-client,auth-messages,email,session,api-error}.ts`,
-  `src/app/api/auth/[...all]/route.ts`, `src/app/api/health-check/route.ts`,
-  `src/app/(auth)/reset-password/page.tsx`,
-  `src/components/auth/reset-password-form.tsx`,
-  `src/components/profil/logout-button.tsx`
-- Diubah: `package.json`, `next.config.ts`, `.gitignore`, `README.md`,
-  `src/components/auth/{login-form,register-form,forgot-password-form,verify-email-card}.tsx`,
-  `src/app/(auth)/verify-email/page.tsx`, `src/app/(app)/pengaturan/page.tsx`
+## File Penting Fase 1
+- Baru: `src/lib/{cats,plan,profile,storage}.ts`,
+  `src/lib/validation/{cat,profile}.ts`,
+  `src/db/seed.ts`, `src/proxy.ts`, `vitest.config.mts`,
+  `vitest.setup.ts`, `tests/{plan,cats}.test.ts`,
+  `src/app/api/{profile,plan,cats,uploads}/**`.
+- Diubah: `src/db/schema.ts`, `src/lib/{auth,session,api-error}.ts`,
+  `src/app/(app)/layout.tsx`, `src/app/(app)/{kucing,profil,paket,onboarding}/**`,
+  `src/components/{layout/sidebar,layout/bottom-nav,auth/login-form,profil/profile-form,onboarding/role-picker}.tsx`,
+  `README.md`, `package.json`, `.gitignore`, `.env.example`.

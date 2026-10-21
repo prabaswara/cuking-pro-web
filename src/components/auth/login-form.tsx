@@ -10,7 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { authClient } from "@/lib/auth-client";
 import { authErrorMessage } from "@/lib/auth-messages";
 
-export function LoginForm() {
+export type DemoAccount = { email: string; label: string };
+
+type LoginFormProps = {
+  demoAccounts?: DemoAccount[];
+  demoPassword?: string;
+};
+
+export function LoginForm({ demoAccounts = [], demoPassword }: LoginFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +72,32 @@ export function LoginForm() {
       setIsResent(true);
     } finally {
       setIsResending(false);
+    }
+  }
+
+  async function handleDemoLogin(email: string) {
+    if (!demoPassword) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error: signInError } = await authClient.signIn.email({
+        email,
+        password: demoPassword,
+      });
+
+      if (signInError) {
+        setError(authErrorMessage(signInError.code, "Akun demo tidak tersedia"));
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -140,20 +173,31 @@ export function LoginForm() {
           </Button>
         </form>
 
-        {/* Bypass demo sementara — hapus saat auth guard (app) dipasang */}
-        <div className="mt-4 rounded-2xl bg-amber-subtle p-3 text-center">
-          <p className="text-xs text-text-muted">
-            Ingin melihat UI tanpa membuat akun?
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push("/dashboard")}
-            className="mt-2 h-10 w-full rounded-full text-sm font-semibold"
-          >
-            Masuk sebagai Demo →
-          </Button>
-        </div>
+        {/* Akun demo — hanya dirender bila DEMO_MODE aktif di server */}
+        {demoAccounts.length > 0 && demoPassword && (
+          <div className="mt-4 rounded-2xl bg-amber-subtle p-3">
+            <p className="text-center text-xs text-text-muted">
+              Coba akun demo (role & paket berbeda):
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {demoAccounts.map((account) => (
+                <Button
+                  key={account.email}
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading}
+                  onClick={() => handleDemoLogin(account.email)}
+                  className="h-10 rounded-full text-xs font-semibold"
+                >
+                  {account.label}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-2 text-center text-[10px] text-text-muted">
+              Data lokal. Tidak tersedia di produksi.
+            </p>
+          </div>
+        )}
 
         <div className="mt-6 text-center">
           <p className="text-sm text-text-muted">
