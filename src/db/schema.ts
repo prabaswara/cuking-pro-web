@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -202,6 +203,112 @@ export const catOwnershipHistory = pgTable(
 );
 
 // ============================================================
+// Fase 2 — kesehatan, berat, pengingat, pakan, dokumen
+// ============================================================
+
+/** Kesehatan dan berat badan digabung (PRD §6): type = 'weight' memakai weight_kg. */
+export const healthRecords = pgTable(
+  "health_records",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catId: uuid("cat_id")
+      .notNull()
+      .references(() => cats.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: ["vaccine", "deworming", "flea", "vet_visit", "medication", "weight", "other"],
+    }).notNull(),
+    title: text("title"),
+    recordDate: date("record_date").notNull(),
+    nextDueDate: date("next_due_date"),
+    weightKg: numeric("weight_kg", { precision: 4, scale: 2, mode: "number" }),
+    vetName: text("vet_name"),
+    cost: integer("cost"),
+    photoPath: text("photo_path"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("health_records_cat_id_idx").on(table.catId),
+    index("health_records_cat_date_idx").on(table.catId, table.recordDate),
+    index("health_records_type_idx").on(table.type),
+  ],
+);
+
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    catId: uuid("cat_id").references(() => cats.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    dueDate: date("due_date").notNull(),
+    sourceType: text("source_type", {
+      enum: ["health", "pregnancy", "booking_planned", "booking_due", "manual"],
+    }).notNull(),
+    sourceId: uuid("source_id"),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    notifiedH3At: timestamp("notified_h3_at", { withTimezone: true }),
+    notifiedD0At: timestamp("notified_d0_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("reminders_user_id_idx").on(table.userId),
+    index("reminders_due_date_idx").on(table.dueDate),
+    index("reminders_source_idx").on(table.sourceType, table.sourceId),
+  ],
+);
+
+/** Jadwal pakan harian per kucing (pendukung halaman Pakan). */
+export const feedingSchedules = pgTable(
+  "feeding_schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catId: uuid("cat_id")
+      .notNull()
+      .references(() => cats.id, { onDelete: "cascade" }),
+    scheduleTime: text("schedule_time").notNull(),
+    portionGrams: integer("portion_grams").notNull(),
+    foodType: text("food_type").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("feeding_schedules_cat_id_idx").on(table.catId)],
+);
+
+/** Brankas dokumen digital per kucing. */
+export const catDocuments = pgTable(
+  "cat_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catId: uuid("cat_id")
+      .notNull()
+      .references(() => cats.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    category: text("category", {
+      enum: ["pedigree", "vaccine_book", "lab", "registration", "other"],
+    })
+      .default("other")
+      .notNull(),
+    filePath: text("file_path"),
+    fileType: text("file_type", { enum: ["pdf", "image"] })
+      .default("pdf")
+      .notNull(),
+    sizeBytes: integer("size_bytes"),
+    uploadedAt: date("uploaded_at").notNull(),
+    source: text("source"),
+    notes: text("notes"),
+    verified: boolean("verified").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("cat_documents_cat_id_idx").on(table.catId),
+    index("cat_documents_uploaded_at_idx").on(table.uploadedAt),
+  ],
+);
+
+// ============================================================
 // Relasi
 // ============================================================
 
@@ -210,6 +317,7 @@ export const userRelations = relations(user, ({ many, one }) => ({
   accounts: many(account),
   cats: many(cats),
   subscriptions: many(subscriptions),
+  reminders: many(reminders),
   profile: one(profiles, {
     fields: [user.id],
     references: [profiles.userId],
@@ -268,6 +376,10 @@ export const catsRelations = relations(cats, ({ one, many }) => ({
     relationName: "cat_dam",
   }),
   ownershipHistory: many(catOwnershipHistory),
+  healthRecords: many(healthRecords),
+  reminders: many(reminders),
+  feedingSchedules: many(feedingSchedules),
+  documents: many(catDocuments),
 }));
 
 export const catOwnershipHistoryRelations = relations(
@@ -283,3 +395,35 @@ export const catOwnershipHistoryRelations = relations(
     }),
   }),
 );
+
+export const healthRecordsRelations = relations(healthRecords, ({ one }) => ({
+  cat: one(cats, {
+    fields: [healthRecords.catId],
+    references: [cats.id],
+  }),
+}));
+
+export const remindersRelations = relations(reminders, ({ one }) => ({
+  user: one(user, {
+    fields: [reminders.userId],
+    references: [user.id],
+  }),
+  cat: one(cats, {
+    fields: [reminders.catId],
+    references: [cats.id],
+  }),
+}));
+
+export const feedingSchedulesRelations = relations(feedingSchedules, ({ one }) => ({
+  cat: one(cats, {
+    fields: [feedingSchedules.catId],
+    references: [cats.id],
+  }),
+}));
+
+export const catDocumentsRelations = relations(catDocuments, ({ one }) => ({
+  cat: one(cats, {
+    fields: [catDocuments.catId],
+    references: [cats.id],
+  }),
+}));
