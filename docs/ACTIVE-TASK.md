@@ -1,89 +1,101 @@
 # Active Task
 
 ## Status Terakhir
-**Backend Fase 1 SELESAI** — profil, paket, kucing, silsilah, upload foto,
-auth guard, akun demo, dan tes otomatis.
+**Backend Fase 2 SELESAI** — kesehatan, berat, jadwal pakan, pengingat,
+dokumen, linimasa, jendela riwayat Free, dan halaman terkait sudah
+memakai data DB.
 
-- Build produksi hijau, `npx tsc --noEmit` bersih, ESLint 0 error.
-- `npm test` → **12 tes lulus** (unit + integrasi PostgreSQL).
-- Data kucing/profil/paket sudah dari DB. Modul lain (kesehatan, berat,
-  breeding, penjualan, jasa pacak, transfer, keuangan) masih mock.
+- `npm run build` → hijau.
+- `npx tsc --noEmit` → bersih.
+- `npm run lint` → 0 error.
+- `npm test` → **45 tes lulus** (5 berkas, termasuk tes integrasi Fase 2).
+- Migrasi `drizzle/0002_dry_sumo.sql` sudah diterapkan ke DB dev & tes.
 
-## Yang Selesai di Fase 1 (21 Okt 2026)
+## Yang Selesai di Fase 2 (22 Okt 2026)
 
-### Skema & aturan paket
-- Tabel baru: `profiles`, `cats`, `cat_ownership_history`, `plans`,
-  `subscriptions` (migrasi `drizzle/0001_windy_cargill.sql`).
-- Indeks unik parsial menjamin satu kepemilikan aktif per kucing.
-- Induk (`sire_id`/`dam_id`) hanya boleh kucing milik pemilik yang sama —
-  dijaga di lapisan API (tidak ada FK lintas pemilik).
-- `src/lib/plan.ts`: satu sumber aturan Free/Pro, jendela riwayat 3 bulan
-  kalender (dengan clamp akhir bulan), hitung kucing, rekonsiliasi status beku.
+### Skema
+- Tabel baru: `health_records`, `reminders`, `feeding_schedules`,
+  `cat_documents` + indeks/relasi.
+- Berat disimpan di `health_records` (`type='weight'`, `weight_kg`),
+  sesuai PRD; endpoint `/api/cats/:id/weights` hanya permukaan khusus.
+- Dua tabel pendukung UI yang belum ada di PRD: `feeding_schedules` dan
+  `cat_documents` (dibutuhkan halaman Pakan & Dokumen).
 
-### API
-- `GET/PATCH /api/profile` — profil + peran + nama.
-- `GET /api/plan` — paket aktif, pemakaian, awal jendela riwayat.
-- `GET/POST /api/cats`, `GET/PATCH/DELETE /api/cats/:id`.
-- `PATCH /api/cats/:id/tracking`, `GET /api/cats/:id/pedigree`.
-- `POST /api/uploads`, `GET /api/uploads/:key` (wajib sesi).
-- Semua query memfilter `owner_id` dari sesi; data pemilik lain → 404.
-- Kucing beku menolak edit (`403 CAT_FROZEN`), kecuali ubah status.
-- Paket Free menolak kucing aktif ke-3 (`403 PLAN_CAT_LIMIT`).
+### API (semua owner-scoped)
+- `GET/POST /api/cats/:id/health`, `PATCH/DELETE /api/health/:id`.
+- `GET/POST /api/cats/:id/weights`, `PATCH/DELETE /api/weights/:id`.
+- `GET/POST /api/reminders`, `PATCH/DELETE /api/reminders/:id`.
+- `GET/POST /api/cats/:id/feeding`, `PATCH/DELETE /api/feeding/:id`.
+- `GET/POST /api/cats/:id/documents`, `PATCH/DELETE /api/documents/:id`.
+- `POST /api/uploads/documents`, `GET /api/uploads/documents/:key`
+  (wajib sesi).
+- Data pemilik lain → `404`; kucing beku → `403 CAT_FROZEN`.
 
-### Auth & demo
-- Auth guard di `(app)/layout.tsx` + `src/proxy.ts` (cookie check → 307).
-- Pemilih 4 akun demo di `/login`, hanya bila `DEMO_MODE="true"`.
-- Peran diambil dari DB dan diteruskan ke Sidebar/BottomNav (bukan
-  `localStorage` lagi).
-- Onboarding & form profil menyimpan peran lewat `PATCH /api/profile`.
+### Aturan bisnis
+- Tanggal catatan tidak boleh masa depan; `nextDueDate` ≥ `recordDate`.
+- Berat > 0 kg dan ≤ 20 kg (validasi Zod di route).
+- Pengingat otomatis (`source_type='health'`, `source_id=healthRecord.id`)
+  dibuat/diperbarui/dihapus mengikuti `nextDueDate`; tidak ada duplikat.
+- Menunda pengingat yang telat dihitung dari hari ini, bukan tanggal lama.
+- Edit pengingat milik kucing beku sekarang ditolak (bug ditemukan tes).
+- Mengubah tipe catatan menjadi `weight` menghapus `nextDueDate` dan
+  pengingat otomatisnya.
+- Free: daftar kesehatan/berat/dokumen memotong riwayat 3 bulan kalender
+  dan mengembalikan `lockedCount` + `windowStart`; Pro tanpa batas.
+- Tidak ada saran medis/interval otomatis; disclaimer tetap di halaman
+  kesehatan.
 
 ### UI tersambung
-- `/kucing` menampilkan kucing dari DB; `/kucing/tambah` menyimpan via API.
-- `/profil` memuat & menyimpan profil DB.
-- `/paket` menampilkan paket, pemakaian, dan harga dari DB.
+- `/dashboard` — statistik kucing & pengingat dari DB, aksi cepat memakai
+  kucing aktif pertama.
+- `/kucing/[id]` — ringkasan berat/kesehatan + jadwal pakan.
+- `/kucing/[id]/kesehatan` + tambah — daftar & form DB.
+- `/kucing/[id]/berat` — grafik & riwayat DB.
+- `/kucing/[id]/pakan/tambah` — simpan jadwal pakan.
+- `/kucing/[id]/dokumen` — unggah/daftar/hapus dokumen privat.
+- `/kucing/[id]/timeline` — linimasa gabungan kesehatan, berat, dokumen,
+  pakan.
+- `/pengingat` — daftar, tambah manual, selesai, tunda, hapus.
 
 ### Tes
-- `vitest.config.mts`, `vitest.setup.ts`, `tests/plan.test.ts`,
-  `tests/cats.test.ts`.
-- Integrasi memakai database `cukingpro_test` dan membersihkan datanya.
-
-## Hasil Verifikasi (production build)
-- `npm run build` → sukses, tanpa error prerender.
-- Tanpa sesi: `/dashboard`, `/kucing/abc` → **307** ke `/login`.
-- Login `free@demo.cukingpro` → `/dashboard`, `/kucing`, `/profil`,
-  `/paket`, `/onboarding` → 200; kucing Mochi & Luna tampil.
-- Free: POST kucing ke-3 → `403 PLAN_CAT_LIMIT`.
-- Pro: POST kucing ke-4 → 201; `/paket` menampilkan "tanpa batas".
-- Isolasi: GET/PATCH/DELETE kucing milik Pro oleh Free → 404.
-- Kucing beku: PATCH nama → `403 CAT_FROZEN`.
-- Upload PNG 1×1 → WebP 96 byte; GET dengan sesi 200, tanpa sesi 401.
-- PATCH peran breeder → menu Jasa Pacak langsung muncul setelah refresh.
+- `tests/health.test.ts` — isolasi, kucing beku, validasi tanggal/berat,
+  sinkronisasi pengingat, jendela Free/Pro.
+- `tests/reminders.test.ts` — isolasi, filter, kucing beku, tunda,
+  selesai, daftar 7 hari.
+- `tests/records.test.ts` — pakan, dokumen, jendela Free dokumen,
+  linimasa gabungan.
+- Total 45 tes lulus bersama `tests/plan.test.ts` dan `tests/cats.test.ts`.
 
 ## Masalah yang Belum Selesai (diketahui)
-1. Harga & durasi Pro masih placeholder (`49000` / 30 hari).
-2. Belum ada SMTP nyata; tautan verifikasi/reset hanya ke log (dev).
-3. Modul kesehatan/berat/breeding/penjualan/jasa pacak/transfer/keuangan
-   masih mock; tabelnya menyusul di fase terkait.
-4. `litter_id` pada `cats` dan `transfer_id` pada riwayat kepemilikan
+1. Modul breeding, penjualan, jasa pacak, transfer, keuangan masih mock.
+2. Harga & durasi Pro masih placeholder (`49000` / 30 hari).
+3. Belum ada SMTP nyata; tautan verifikasi/reset hanya ke log (dev).
+4. Upload avatar profil belum disambungkan.
+5. Midtrans, cron notifikasi, dan Web Push belum ada.
+6. `litter_id` pada `cats` dan `transfer_id` pada riwayat kepemilikan
    ditunda sampai tabel Fase 3/5 ada.
-5. Upload avatar profil belum disambungkan (tombol masih disabled).
-6. Midtrans & cron job belum ada (Fase 6).
-7. Logout belum menghapus langganan Web Push (TODO FR-21).
+7. Dokumen hanya disimpan lokal di `.data/documents/`; belum ada
+   pemindaian malware/verifikasi eksternal.
 
-## Langkah Berikutnya (Fase 2)
-A. Tabel kesehatan, berat, pakan, pengingat, dokumen + API owner-scoped.
-B. Terapkan jendela riwayat Free (banner "N data terkunci").
-C. Sambungkan halaman `/kucing/[id]/kesehatan`, `/berat`, `/pakan`,
-   `/dokumen`, `/timeline` ke API.
+## Langkah Berikutnya (Fase 3)
+A. Skema & API breeding: siklus birahi, perkawinan, kehamilan, litter.
+B. Sambungkan halaman `/breeding` dan sub-route-nya ke DB.
+C. Terapkan aturan kelahiran (jumlah hidup ≤ lahir, sekali catat) dan
+   siklus birahi (betina, tanpa tumpang tindih).
 D. Update `docs/AI-CONTEXT.md` tiap akhir sesi.
 
+## File Penting Fase 2
+- Baru: `src/lib/{health,reminders,feeding,documents,timeline,date,labels}.ts`,
+  `src/lib/validation/{health,reminder,feeding,document}.ts`,
+  `src/app/api/{cats/[id]/health,cats/[id]/weights,cats/[id]/feeding,cats/[id]/documents,health,weights,reminders,feeding,documents,uploads/documents}/**`,
+  `tests/{health,reminders,records}.test.ts`.
+- Diubah: `src/db/schema.ts`, `drizzle/0002_dry_sumo.sql`,
+  `src/lib/storage.ts`, halaman `(app)/dashboard`,
+  `kucing/[id]/{page,kesehatan,berat,dokumen,timeline,pakan}`,
+  `(app)/pengingat`, komponen `berat/`, `dokumen/`, `kesehatan/`,
+  `kucing/timeline-list`, `pengingat/`.
+
 ## File Penting Fase 1
-- Baru: `src/lib/{cats,plan,profile,storage}.ts`,
-  `src/lib/validation/{cat,profile}.ts`,
-  `src/db/seed.ts`, `src/proxy.ts`, `vitest.config.mts`,
-  `vitest.setup.ts`, `tests/{plan,cats}.test.ts`,
-  `src/app/api/{profile,plan,cats,uploads}/**`.
-- Diubah: `src/db/schema.ts`, `src/lib/{auth,session,api-error}.ts`,
-  `src/app/(app)/layout.tsx`, `src/app/(app)/{kucing,profil,paket,onboarding}/**`,
-  `src/components/{layout/sidebar,layout/bottom-nav,auth/login-form,profil/profile-form,onboarding/role-picker}.tsx`,
-  `README.md`, `package.json`, `.gitignore`, `.env.example`.
+- `src/lib/{cats,plan,profile,storage}.ts`,
+  `src/lib/validation/{cat,profile}.ts`, `src/db/seed.ts`, `src/proxy.ts`,
+  `tests/{plan,cats}.test.ts`, API profil/plan/kucing/uploads.

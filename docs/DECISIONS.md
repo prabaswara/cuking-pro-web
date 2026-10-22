@@ -105,6 +105,39 @@ Format: **Tanggal — Keputusan** (alasan → dampak)
 - **Harga & durasi Pro placeholder (`49000` / 30 hari)** di seed →
   menunggu keputusan pemilik produk; UI membaca nilai dari tabel `plans`.
 
+## 2026-10-22 (Fase 2)
+- **Berat disimpan di `health_records` (`type='weight'`, `weight_kg`)**
+  sesuai PRD §6, bukan tabel terpisah → endpoint `/api/cats/:id/weights`
+  hanya permukaan khusus di atas tabel yang sama; linimasa & jendela
+  riwayat otomatis konsisten.
+- **Menambah tabel `feeding_schedules` dan `cat_documents`** karena
+  halaman Pakan & Dokumen sudah ada di UI tetapi belum punya padanan di
+  PRD → migrasi `0002`; jika PRD berubah, tabel ini yang menyesuaikan.
+- **Pengingat otomatis memakai `source_type='health'` + `source_id`**
+  (bukan mencocokkan judul) → satu catatan kesehatan hanya punya satu
+  pengingat; update/hapus catatan selalu menyinkronkan pengingat dalam
+  transaksi yang sama.
+- **Menunda pengingat yang sudah lewat dihitung dari hari ini** →
+  pengingat tidak langsung telat lagi setelah ditunda; pengingat
+  mendatang tetap digeser dari tanggal jatuh temponya.
+- **Mengubah tipe catatan menjadi `weight` menghapus `nextDueDate`** →
+  catatan berat tidak menyimpan jadwal berikutnya dan tidak membuat
+  pengingat; mencegah pengingat "hantu" saat tipe diubah kembali.
+- **Jendela riwayat Free 3 bulan kalender dihitung dari hari ini** dan
+  diterapkan di lapisan data (bukan hanya UI) → `lockedCount` &
+  `windowStart` dikirim ke klien; Pro mengembalikan `null`/0.
+- **Dokumen disimpan lokal di `.data/documents/` dan hanya dilayani
+  lewat route ber sesi** → konsisten dengan foto; tidak ada URL publik.
+- **`verified` selalu `false` dari API dan UI tidak mengklaim
+  verifikasi CFA/ICA** → menghindari klaim yang tidak didukung proses
+  verifikasi nyata.
+- **Edit pengingat memeriksa kucing lama maupun kucing tujuan** →
+  pengingat milik kucing beku tidak bisa diubah hanya karena `catId`
+  tidak dikirim (bug ditemukan oleh tes integrasi).
+- **Tes Fase 2 menguji lapisan data terhadap PostgreSQL** (bukan route
+  handler), mencakup isolasi pemilik, kucing beku, sinkronisasi
+  pengingat, jendela Free, dan validasi berat.
+
 ## Template entri baru
 ```
 ## YYYY-MM-DD

@@ -1,6 +1,8 @@
-# AI Context — cukingPro Web (update terakhir: 21 Okt 2026)
+# AI Context — cukingPro Web (update terakhir: 22 Okt 2026)
 
 ## Kondisi Saat Ini
+- **Backend Fase 2 SELESAI**: kesehatan, berat, jadwal pakan, pengingat,
+  dokumen, linimasa, jendela riwayat Free, dan halaman terkait.
 - **Backend Fase 1 SELESAI**: profil, paket (Free/Pro), kucing, silsilah,
   upload foto, auth guard, akun demo, dan tes otomatis.
 - **Backend Fase 0 SELESAI**: PostgreSQL + Drizzle, Better Auth
@@ -9,7 +11,7 @@
 - **UI/UX Fase 1–6 SELESAI**; modul yang sudah punya API memakai data DB,
   sisanya masih `src/lib/mock.ts`.
 - Build produksi hijau (`npm run build`), `npx tsc --noEmit` bersih,
-  `npx eslint src` **0 error / 0 warning**, `npm test` **12 lulus**.
+  `npm run lint` **0 error**, `npm test` **45 lulus** (5 berkas).
 - **Auth guard aktif**: `src/proxy.ts` (cookie → 307) + pengecekan sesi
   Better Auth di `(app)/layout.tsx`. Tidak ada lagi bypass demo.
 - **Akun demo** (`free@`, `breeder@`, `stud@`, `pro@demo.cukingpro`)
@@ -20,25 +22,38 @@
   `cukingpro:onboarded` untuk banner Beranda.
 - Foto kucing disimpan di `.data/uploads/` dan diakses lewat
   `/api/uploads/:key` dengan sesi valid.
+- Dokumen privat disimpan di `.data/documents/` dan diakses lewat
+  `/api/uploads/documents/:key` dengan sesi valid.
 
 ## Backend yang Sudah Ada
 - `src/db/schema.ts` — tabel auth Better Auth (`user`, `session`,
   `account`, `verification`) + `profiles`, `cats`, `cat_ownership_history`,
-  `plans`, `subscriptions`; migrasi di `drizzle/`.
+  `plans`, `subscriptions`, `health_records`, `reminders`,
+  `feeding_schedules`, `cat_documents`; migrasi di `drizzle/`
+  (`0001` Fase 1, `0002` Fase 2).
 - `src/db/index.ts` — Drizzle + `postgres-js` (singleton saat dev).
 - `src/db/seed.ts` — 4 akun demo + kucing + plan Pro (idempoten).
 - `src/lib/auth.ts` — Better Auth + Drizzle adapter; verifikasi email
   wajib; plugin `nextCookies()` terakhir; hook membuat baris `profiles`.
 - `src/lib/{cats,plan,profile}.ts` — lapisan data owner-scoped + aturan
   paket (batas 2 kucing Free, jendela riwayat 3 bulan, rekonsiliasi beku).
-- `src/lib/storage.ts` — simpan/kompres foto (sharp → WebP) di
-  `.data/uploads/`; antarmuka siap diganti S3/R2.
+- `src/lib/{health,reminders,feeding,documents,timeline}.ts` — CRUD domain
+  Fase 2, sinkronisasi pengingat otomatis, jendela riwayat, linimasa.
+- `src/lib/{date,labels}.ts` — helper tanggal kalender lokal & label UI.
+- `src/lib/validation/{cat,profile,health,reminder,feeding,document}.ts` —
+  skema Zod; route memvalidasi ulang.
+- `src/lib/storage.ts` — simpan/kompres foto (sharp → WebP) dan dokumen
+  (PDF/gambar) di `.data/`; antarmuka siap diganti S3/R2.
 - `src/app/api/auth/[...all]/route.ts` — handler `toNextJsHandler(auth)`.
 - `src/app/api/health-check/route.ts` — `{ ok: true }` + ping DB.
 - `src/app/api/profile/route.ts` — GET/PATCH profil.
 - `src/app/api/plan/route.ts` — paket + pemakaian + jendela riwayat.
-- `src/app/api/cats/**` — CRUD, tracking, pedigree.
-- `src/app/api/uploads/**` — POST/GET foto (sesi wajib).
+- `src/app/api/cats/**` — CRUD, tracking, pedigree, health, weights,
+  feeding, documents.
+- `src/app/api/{health,weights,reminders,feeding,documents}/[id]` —
+  PATCH/DELETE per entri.
+- `src/app/api/reminders/route.ts` — GET/POST pengingat manual.
+- `src/app/api/uploads/**` — POST/GET foto & dokumen (sesi wajib).
 - `src/lib/session.ts` — `getSession()`, `requireSession()` (memanggil
   `connection()` agar route handler tidak ikut prerender).
 - `src/lib/api-error.ts` — `ApiError` / `handleRouteError` (PRD §11);
@@ -46,20 +61,25 @@
 - `src/proxy.ts` — cek cookie sesi → redirect 307 ke `/login`.
 - Env: `.env.example` (lengkap), `.env` lokal gitignored; `.env.test`
   untuk database tes.
-- Tes: `tests/plan.test.ts` (unit), `tests/cats.test.ts` (integrasi DB).
+- Tes: `tests/{plan,cats,health,reminders,records}.test.ts` (unit +
+  integrasi PostgreSQL).
 
 ## Fitur per Halaman (sudah jadi)
 - `/` landing (+tautan legal); auth: `/login` (pemilih akun demo),
   `/register`, `/forgot-password`, `/verify-email`, `/reset-password`
 - `/onboarding` (peran disimpan ke DB via API)
-- `/dashboard` (pengingat 7 hari dari mock + banner onboarding)
+- `/dashboard` — statistik kucing + pengingat 7 hari dari DB, aksi cepat
+  memakai kucing aktif pertama
 - `/kucing` & `/kucing/tambah` — **data DB**; detail/edit/silsilah/jual
-  masih mock kecuali endpoint silsilah sudah tersedia
+  memakai DB kecuali modul yang masih mock
+- `/kucing/[id]` — **ringkasan DB**: berat terakhir, catatan kesehatan,
+  jadwal pakan
 - `/kucing/[id]/kesehatan` (+tambah), `/berat`, `/dokumen`, `/timeline`,
-  `/aktivitas`, `/pakan` — masih mock (Fase 2)
+  `/pakan/tambah` — **data DB**
 - `/profil` — **profil & peran dari DB**
 - `/paket` — **paket, pemakaian, harga dari DB** (pembayaran masih mock)
-- `/pengaturan`, `/pengingat`, `/notifikasi`
+- `/pengaturan`, `/notifikasi`
+- `/pengingat` — **daftar/tambah/selesai/tunda/hapus dari DB**
 - `/breeding` (tab Siklus Birahi / Kawin & Kehamilan / Penjualan),
   `/breeding/kehamilan/[id]` + `/lahir`, `/breeding/litter/[id]`
   + `/tambah-anak`, `/penjualan/[id]/edit` — mock
@@ -75,7 +95,16 @@
   (`src/lib/cats.ts`); aturan paket terpusat di `src/lib/plan.ts`;
   data pemilik lain selalu 404.
 - **Penyimpanan lokal di balik antarmuka** (`storage.ts`): berkas di
-  `.data/uploads/`, akses lewat route ber sesi; S3/R2 menyusul.
+  `.data/uploads/` (foto) dan `.data/documents/` (dokumen), akses lewat
+  route ber sesi; S3/R2 menyusul.
+- **Backend Fase 2**: berat disimpan di `health_records` (`type='weight'`)
+  sesuai PRD; `/weights` hanya permukaan khusus. Pengingat otomatis
+  memakai `source_type='health'` + `source_id` unik agar tidak duplikat.
+- **Jendela riwayat Free** dihitung dari hari ini (3 bulan kalender) dan
+  diterapkan di daftar kesehatan/berat/dokumen; respons menyertakan
+  `lockedCount` + `windowStart` untuk banner UI.
+- **Dokumen tidak diklaim terverifikasi**: `verified` selalu `false` dari
+  API; UI menampilkan "Akses privat" / "Belum diverifikasi".
 - **Akun demo = user Better Auth hasil seed**, bukan endpoint palsu;
   pemilih akun digerbangi `DEMO_MODE` di server.
 - **Peran dari DB** diteruskan sebagai props; `localStorage` hanya untuk
@@ -92,9 +121,12 @@
 
 ## Batasan / Yang Perlu Diketahui Agent Berikutnya
 - Sudah ada: Better Auth, Drizzle/DB, migrasi, seed demo, API profil/plan/
-  kucing/uploads, auth guard, tes Vitest.
-- Belum ada: API kesehatan/berat/pakan/pengingat/dokumen/breeding/
-  penjualan/jasa pacak/transfer/keuangan, cron job, Midtrans, SMTP nyata.
+  kucing/uploads/kesehatan/berat/pakan/pengingat/dokumen, auth guard,
+  tes Vitest.
+- Belum ada: API breeding/penjualan/jasa pacak/transfer/keuangan,
+  cron job, Midtrans, SMTP nyata.
+- Tabel `feeding_schedules` & `cat_documents` adalah pendukung UI dan
+  belum tercantum eksplisit di PRD.
 - `cats.litter_id` & `cat_ownership_history.transfer_id` ditunda sampai
   tabel Fase 3/5 dibuat.
 - Upload avatar profil belum disambungkan (tombol disabled).
