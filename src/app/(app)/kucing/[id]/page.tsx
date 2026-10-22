@@ -7,6 +7,7 @@ import { getCat, getPedigree } from "@/lib/cats";
 import { formatAge, formatDateID } from "@/lib/date";
 import { listFeedingSchedules } from "@/lib/feeding";
 import { getLatestHealthRecord, getLatestWeight } from "@/lib/health";
+import { getOrCreateProfile } from "@/lib/profile";
 import { getSession } from "@/lib/session";
 
 interface KucingDetailPageProps {
@@ -23,6 +24,8 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
 
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const profile = await getOrCreateProfile(session.user.id);
 
   let cat;
   try {
@@ -115,7 +118,15 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
           </div>
 
           {/* Quick Actions */}
-          <div className="mt-6 grid grid-cols-4 gap-2">
+          <div
+            className={`mt-6 grid gap-2 ${
+              profile.isBreeder &&
+              cat.status === "active" &&
+              cat.trackingStatus === "tracked"
+                ? "grid-cols-4"
+                : "grid-cols-3"
+            }`}
+          >
             <Link
               href={`/kucing/${cat.id}/kesehatan/tambah`}
               className="flex flex-col items-center gap-1 rounded-2xl bg-surface-container-low p-3 transition-transform active:scale-95"
@@ -137,13 +148,17 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
               <span className="material-symbols-outlined text-xl text-tertiary">pets</span>
               <span className="text-xs font-semibold">Aktivitas</span>
             </Link>
-            <Link
-              href={`/kucing/${cat.id}/jual`}
-              className="flex flex-col items-center gap-1 rounded-2xl bg-surface-container-low p-3 transition-transform active:scale-95"
-            >
-              <span className="material-symbols-outlined text-xl text-primary">sell</span>
-              <span className="text-xs font-semibold">Jual</span>
-            </Link>
+            {profile.isBreeder &&
+              cat.status === "active" &&
+              cat.trackingStatus === "tracked" && (
+                <Link
+                  href={`/kucing/${cat.id}/jual`}
+                  className="flex flex-col items-center gap-1 rounded-2xl bg-surface-container-low p-3 transition-transform active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-xl text-primary">sell</span>
+                  <span className="text-xs font-semibold">Jual</span>
+                </Link>
+              )}
           </div>
         </CardContent>
       </Card>

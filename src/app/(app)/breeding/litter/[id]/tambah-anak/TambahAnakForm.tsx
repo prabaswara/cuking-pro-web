@@ -7,115 +7,165 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { GenderSelect } from "@/components/kucing/gender-select";
+import { formatDateID, todayIso } from "@/lib/date";
 
-interface TambahAnakFormProps {
-  litterId: string;
-  totalAlive: number;
-  queenName: string;
-  sireName: string;
+function readApiError(data: unknown): string {
+  return (
+    (data as { error?: { message?: string } })?.error?.message ??
+    "Terjadi kesalahan. Silakan coba lagi."
+  );
 }
 
-export function TambahAnakForm({ litterId, totalAlive }: TambahAnakFormProps) {
+export function TambahAnakForm({
+  litterId,
+  litterBirthDate,
+  totalAlive,
+  registeredCount,
+  queenName,
+  sireName,
+}: {
+  litterId: string;
+  litterBirthDate: string;
+  totalAlive: number;
+  registeredCount: number;
+  queenName: string;
+  sireName: string;
+}) {
   const router = useRouter();
-  const [submittedCount, setSubmittedCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Default values for each kitten
+  const [registered, setRegistered] = useState(registeredCount);
   const [kitten, setKitten] = useState({
     name: "",
-    sex: "",
+    sex: "" as "" | "male" | "female",
     color: "",
     breed: "",
-    birthDate: "",
-    photoPath: null as string | null,
+    notes: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  function todayStr() {
-    const t = new Date();
-    return t.toISOString().slice(0, 10);
-  }
+  const remaining = Math.max(totalAlive - registered, 0);
 
-  function handleChange(field: string, value: string) {
-    setKitten(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
-  }
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const sex = formData.get("sex") as string;
-    const name = formData.get("name") as string;
-    const breed = formData.get("breed") as string;
-    const color = formData.get("color") as string;
-    const birthDate = formData.get("birthDate") as string;
-
-    const nextErrors: Record<string, string> = {};
-    if (!name.trim()) nextErrors.name = "Nama wajib diisi";
-    if (!sex) nextErrors.sex = "Pilih jenis kelamin";
-    if (!color.trim()) nextErrors.color = "Warna wajib diisi";
-    if (!birthDate) nextErrors.birthDate = "Tanggal lahir wajib diisi";
-    if (birthDate > todayStr()) nextErrors.birthDate = "Tanggal tidak boleh di masa depan";
-    if (!breed.trim()) nextErrors.breed = "Ras wajib diisi";
-
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-
-    setIsLoading(true);
-    // TODO: POST /api/litters/:id/kittens
-    await new Promise(r => setTimeout(r, 800));
-    setIsLoading(false);
-
-    const nextCount = submittedCount + 1;
-    setSubmittedCount(nextCount);
-
-    if (nextCount >= totalAlive) {
-      router.push(`/breeding/litter/${litterId}`);
+  function handleChange(field: keyof typeof kitten, value: string) {
+    setKitten((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
     }
   }
 
-  const remaining = totalAlive - submittedCount;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const nextErrors: Record<string, string> = {};
+
+    if (!kitten.name.trim()) nextErrors.name = "Nama wajib diisi";
+    if (!kitten.sex) nextErrors.sex = "Pilih jenis kelamin";
+    if (!kitten.color.trim()) nextErrors.color = "Warna wajib diisi";
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(`/api/litters/${litterId}/kittens`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: kitten.name.trim(),
+          sex: kitten.sex,
+          breed: kitten.breed.trim() || null,
+          color: kitten.color.trim(),
+          birthDate: litterBirthDate,
+          notes: kitten.notes.trim() || null,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setError(readApiError(data));
+        return;
+      }
+
+      const nextRegistered = registered + 1;
+      setRegistered(nextRegistered);
+      setKitten({ name: "", sex: "", color: "", breed: "", notes: "" });
+
+      if (nextRegistered >= totalAlive) {
+        router.push(`/breeding/litter/${litterId}`);
+        return;
+      }
+
+      setSuccess(
+        `Anak kucing berhasil didaftarkan. ${Math.max(
+          totalAlive - nextRegistered,
+          0,
+        )} anak hidup lagi yang belum didaftarkan.`,
+      );
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
     <Card className="rounded-3xl border-sand-border shadow-warm-sm">
       <CardHeader>
         <CardTitle className="text-lg">Data Anak Kucing</CardTitle>
         <CardDescription>
-          Masukkan data anak ke-{submittedCount + 1} dari {totalAlive} hidup
+          {queenName} × {sireName} • Lahir {formatDateID(litterBirthDate)}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <p className="rounded-xl bg-error-container p-3 text-sm text-error">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="rounded-xl bg-mint-subtle p-3 text-sm text-secondary">
+              {success}
+            </p>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="name">Nama *</Label>
             <Input
               id="name"
               value={kitten.name}
-              onChange={(e) => handleChange("name", e.target.value)}
+              onChange={(event) => handleChange("name", event.target.value)}
               placeholder="cth: Mochi Jr."
               className="h-12 rounded-2xl border-sand-border"
             />
-            {errors.name && <p className="text-sm text-error">{errors.name}</p>}
+            {errors.name && (
+              <p className="text-sm text-error">{errors.name}</p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label>Jenis Kelamin *</Label>
-            <GenderSelect name="sex" defaultValue={kitten.sex as "male" | "female" | ""} />
-            {errors.sex && <p className="text-sm text-error">{errors.sex}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="breed">Ras *</Label>
-            <Input
-              id="breed"
-              value={kitten.breed}
-              onChange={(e) => handleChange("breed", e.target.value)}
-              placeholder="cth: British Shorthair"
-              className="h-12 rounded-2xl border-sand-border"
+            <GenderSelect
+              name="sex"
+              defaultValue={kitten.sex}
+              onChange={(value) => handleChange("sex", value)}
             />
-            {errors.breed && <p className="text-sm text-error">{errors.breed}</p>}
+            {errors.sex && <p className="text-sm text-error">{errors.sex}</p>}
           </div>
 
           <div className="space-y-2">
@@ -123,57 +173,78 @@ export function TambahAnakForm({ litterId, totalAlive }: TambahAnakFormProps) {
             <Input
               id="color"
               value={kitten.color}
-              onChange={(e) => handleChange("color", e.target.value)}
+              onChange={(event) => handleChange("color", event.target.value)}
               placeholder="cth: Lilac Solid"
               className="h-12 rounded-2xl border-sand-border"
             />
-            {errors.color && <p className="text-sm text-error">{errors.color}</p>}
+            {errors.color && (
+              <p className="text-sm text-error">{errors.color}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="birthDate">Tanggal Lahir *</Label>
+            <Label htmlFor="breed">Ras (opsional)</Label>
+            <Input
+              id="breed"
+              value={kitten.breed}
+              onChange={(event) => handleChange("breed", event.target.value)}
+              placeholder="cth: British Shorthair"
+              className="h-12 rounded-2xl border-sand-border"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="birthDate">Tanggal Lahir</Label>
             <Input
               id="birthDate"
               type="date"
-              value={kitten.birthDate}
-              onChange={(e) => handleChange("birthDate", e.target.value)}
-              max={todayStr()}
+              value={litterBirthDate}
+              disabled
+              max={todayIso()}
               className="h-12 rounded-2xl border-sand-border"
             />
-            {errors.birthDate && <p className="text-sm text-error">{errors.birthDate}</p>}
+            <p className="text-xs text-text-muted">
+              Mengikuti tanggal lahir litter. Bisa diubah dari halaman detail
+              kucing setelah terdaftar.
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Catatan</Label>
             <Textarea
               id="notes"
+              value={kitten.notes}
+              onChange={(event) => handleChange("notes", event.target.value)}
               rows={3}
               placeholder="Catatan khusus (mis. warna kaki, ciri khas, dll.)"
               className="rounded-2xl border-sand-border"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Foto (opsional)</Label>
-            <div className="flex h-24 items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sand-border bg-surface-container-low text-sm text-text-muted">
-              <span className="material-symbols-outlined text-xl">add_a_photo</span>
-              Ambil dari kamera / galeri (maks. 5 MB)
-            </div>
-          </div>
-
           <div className="flex flex-col gap-3 pt-2">
-            <Button type="submit" disabled={isLoading} className="h-14 w-full rounded-full text-base font-semibold">
-              {isLoading ? "Menyimpan..." : `Simpan Anak Kucing (${remaining} tersisa)`}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="h-14 w-full rounded-full text-base font-semibold"
+            >
+              {isLoading
+                ? "Menyimpan..."
+                : `Simpan Anak Kucing (${remaining} tersisa)`}
             </Button>
             <Link href={`/breeding/litter/${litterId}`} className="w-full">
-              <Button type="button" variant="outline" className="h-12 w-full rounded-full" disabled={submittedCount === 0}>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 w-full rounded-full"
+                disabled={isLoading}
+              >
                 Selesai & Kembali
               </Button>
             </Link>
           </div>
 
           <p className="text-center text-xs text-text-muted">
-            {remaining} dari {totalAlive} anak kucing yang perlu didaftarkan
+            {registered} dari {totalAlive} anak hidup sudah didaftarkan
           </p>
         </form>
       </CardContent>

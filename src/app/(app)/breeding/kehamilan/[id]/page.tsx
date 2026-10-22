@@ -1,24 +1,38 @@
-import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getMating, getLitterByMating, getQueenDisplayName, getSireDisplayName } from "@/lib/mock";
-import { formatDateID, daysUntil } from "@/lib/mock";
+import { ApiError } from "@/lib/api-error";
+import { daysUntil, formatDateID } from "@/lib/date";
+import { getMating } from "@/lib/matings";
+import { getSession } from "@/lib/session";
+import { MatingActions } from "./MatingActions";
 
 interface KehamilanPageProps {
   params: Promise<{ id: string }>;
 }
 
+const STATUS_LABEL = {
+  pending: "Menunggu Konfirmasi",
+  pregnant: "Hamil",
+  not_pregnant: "Tidak Hamil",
+  delivered: "Sudah Melahirkan",
+} as const;
+
 export default async function KehamilanPage({ params }: KehamilanPageProps) {
-  await connection();
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   const { id } = await params;
-  const mating = getMating(id);
 
-  if (!mating) notFound();
+  let mating;
+  try {
+    mating = await getMating(session.user.id, id);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "NOT_FOUND") notFound();
+    throw error;
+  }
 
-  const queenName = getQueenDisplayName(mating);
-  const sireName = getSireDisplayName(mating);
-  const litter = getLitterByMating(mating.id);
+  const litter = mating.litter;
   const isPregnant = mating.outcome === "pregnant";
   const isDelivered = mating.outcome === "delivered";
 
@@ -32,81 +46,107 @@ export default async function KehamilanPage({ params }: KehamilanPageProps) {
           <span className="material-symbols-outlined text-lg">arrow_back</span>
           Kembali ke Breeding
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-on-surface">Kehamilan {queenName}</h1>
+        <h1 className="mt-2 text-2xl font-bold text-on-surface">
+          Kehamilan {mating.queenName}
+        </h1>
         <p className="mt-1 text-text-muted">Pantau perkembangan kehamilan</p>
       </div>
 
-      {/* Header Card */}
       <div className="rounded-3xl border-sand-border bg-surface-card p-6 shadow-warm-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-lavender-subtle text-tertiary">
-              <span className="material-symbols-outlined text-2xl">pregnant_woman</span>
+              <span className="material-symbols-outlined text-2xl">
+                pregnant_woman
+              </span>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-on-surface">{queenName}</h2>
-              <p className="text-sm text-text-muted">Ayah: {sireName}</p>
-              <p className="text-sm text-text-muted">Tanggal Kawin: {formatDateID(mating.matingDate)}</p>
+              <h2 className="text-xl font-bold text-on-surface">
+                {mating.queenName}
+              </h2>
+              <p className="text-sm text-text-muted">Ayah: {mating.sireName}</p>
+              <p className="text-sm text-text-muted">
+                Tanggal Kawin: {formatDateID(mating.matingDate)}
+              </p>
             </div>
           </div>
           <span className="shrink-0 rounded-full bg-lavender-subtle px-3 py-1 text-sm font-semibold text-tertiary">
-            {isPregnant ? "Hamil" : isDelivered ? "Sudah Melahirkan" : "Menunggu Konfirmasi"}
+            {STATUS_LABEL[mating.outcome]}
           </span>
         </div>
 
         {isPregnant && mating.expectedDueDate && (
-          <div className="mt-4 rounded-2xl bg-error-container/20 p-4 border border-error-container">
-            <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="mt-4 rounded-2xl border border-error-container bg-error-container/20 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-error">event</span>
+                <span className="material-symbols-outlined text-error">
+                  event
+                </span>
                 <div>
-                  <p className="font-semibold text-error">Estimasi Lahir: {formatDateID(mating.expectedDueDate)}</p>
+                  <p className="font-semibold text-error">
+                    Estimasi Lahir: {formatDateID(mating.expectedDueDate)}
+                  </p>
                   <p className="text-sm text-text-muted">
                     {daysUntil(mating.expectedDueDate) > 0
                       ? `Masih ${daysUntil(mating.expectedDueDate)} hari lagi`
                       : daysUntil(mating.expectedDueDate) === 0
                         ? "Hari ini!"
-                        : `Terlambat ${Math.abs(daysUntil(mating.expectedDueDate))} hari`}
+                        : `Terlambat ${Math.abs(
+                            daysUntil(mating.expectedDueDate),
+                          )} hari`}
                   </p>
                 </div>
               </div>
               {!litter && (
                 <Link href={`/breeding/kehamilan/${mating.id}/lahir`}>
-                  <Button className="h-10 rounded-full px-4">Catat Kelahiran</Button>
+                  <Button className="h-10 rounded-full px-4">
+                    Catat Kelahiran
+                  </Button>
                 </Link>
               )}
             </div>
           </div>
         )}
 
+        {mating.relationshipWarning && (
+          <p className="mt-4 rounded-2xl border border-amber-subtle bg-amber-subtle/40 p-3 text-sm text-honey-amber">
+            {mating.relationshipWarning}
+          </p>
+        )}
+
         {litter && (
-          <div className="mt-4 rounded-2xl bg-mint-subtle p-4 border border-soft-mint">
-            <div className="flex items-center justify-between">
+          <div className="mt-4 rounded-2xl border border-soft-mint bg-mint-subtle p-4">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">cradle</span>
+                <span className="material-symbols-outlined text-secondary">
+                  cradle
+                </span>
                 <div>
-                  <p className="font-semibold text-secondary">Lahir: {formatDateID(litter.birthDate)}</p>
+                  <p className="font-semibold text-secondary">
+                    Lahir: {formatDateID(litter.birthDate)}
+                  </p>
                   <p className="text-sm text-text-muted">
                     {litter.totalAlive} / {litter.totalBorn} anak hidup
                   </p>
                 </div>
               </div>
               <Link href={`/breeding/litter/${litter.id}`}>
-                <Button variant="outline" className="h-10 rounded-full px-4">Lihat Litter</Button>
+                <Button variant="outline" className="h-10 rounded-full px-4">
+                  Lihat Litter
+                </Button>
               </Link>
             </div>
           </div>
         )}
       </div>
 
-      {/* Timeline */}
       <div className="rounded-3xl border-sand-border bg-surface-card p-4 shadow-warm-sm">
         <h3 className="font-bold text-on-surface">Timeline</h3>
         <div className="mt-4 space-y-4">
           <TimelineItem
             date={mating.matingDate}
             title="Kawin"
-            desc={`Dengan ${sireName}`}
+            desc={`Dengan ${mating.sireName}`}
             icon="favorite"
             color="text-tertiary"
             bg="bg-lavender-subtle"
@@ -115,7 +155,11 @@ export default async function KehamilanPage({ params }: KehamilanPageProps) {
             <TimelineItem
               date={mating.expectedDueDate ?? ""}
               title="Estimasi Lahir"
-              desc={mating.expectedDueDate ? formatDateID(mating.expectedDueDate) : "Belum ditentukan"}
+              desc={
+                mating.expectedDueDate
+                  ? formatDateID(mating.expectedDueDate)
+                  : "Belum ditentukan"
+              }
               icon="schedule"
               color="text-error"
               bg="bg-error-container"
@@ -141,10 +185,19 @@ export default async function KehamilanPage({ params }: KehamilanPageProps) {
               bg="bg-surface-container"
             />
           )}
+          {isDelivered && !litter && (
+            <TimelineItem
+              date={mating.matingDate}
+              title="Sudah Melahirkan"
+              desc="Catatan kelahiran belum tersedia"
+              icon="cradle"
+              color="text-secondary"
+              bg="bg-mint-subtle"
+            />
+          )}
         </div>
       </div>
 
-      {/* Catatan */}
       {mating.notes && (
         <div className="rounded-3xl border-sand-border bg-surface-card p-4 shadow-warm-sm">
           <h3 className="font-bold text-on-surface">Catatan</h3>
@@ -152,16 +205,13 @@ export default async function KehamilanPage({ params }: KehamilanPageProps) {
         </div>
       )}
 
-      {/* Aksi */}
-      {!litter && isPregnant && (
-        <div className="flex gap-3">
-          <Link href={`/breeding/kehamilan/${mating.id}/lahir`}>
-            <Button className="h-12 flex-1 rounded-full">Catat Kelahiran</Button>
-          </Link>
-          <Button variant="outline" className="h-12 flex-1 rounded-full">
-            Ubah Estimasi Lahir
-          </Button>
-        </div>
+      {!litter && (
+        <MatingActions
+          matingId={mating.id}
+          outcome={mating.outcome}
+          expectedDueDate={mating.expectedDueDate}
+          hasLitter={Boolean(litter)}
+        />
       )}
     </div>
   );
@@ -183,14 +233,18 @@ function TimelineItem({
   bg: string;
 }) {
   return (
-    <div className="relative flex items-start gap-3 pl-8 before:absolute before:left-[10px] before:top-0 before:bottom-0 before:w-[2px] before:bg-sand-border last:before:hidden">
-      <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full ${bg} ${color}`}>
+    <div className="relative flex items-start gap-3 pl-8 before:absolute before:bottom-0 before:left-[10px] before:top-0 before:w-[2px] before:bg-sand-border last:before:hidden">
+      <div
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${bg} ${color}`}
+      >
         <span className="material-symbols-outlined text-lg">{icon}</span>
       </div>
       <div className="flex-1 pt-1">
         <div className="flex items-center justify-between">
           <p className="font-semibold text-on-surface">{title}</p>
-          <span className="text-sm text-text-muted">{date ? formatDateID(date) : "-"}</span>
+          <span className="text-sm text-text-muted">
+            {date ? formatDateID(date) : "-"}
+          </span>
         </div>
         <p className="text-sm text-text-muted">{desc}</p>
       </div>

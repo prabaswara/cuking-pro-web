@@ -1,7 +1,8 @@
-import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { getCatSalesForUser } from "@/lib/mock";
+import { ApiError } from "@/lib/api-error";
+import { getSale } from "@/lib/sales";
+import { getSession } from "@/lib/session";
 import { SaleEditForm } from "./SaleEditForm";
 
 interface EditSalePageProps {
@@ -9,11 +10,22 @@ interface EditSalePageProps {
 }
 
 export default async function EditSalePage({ params }: EditSalePageProps) {
-  await connection();
-  const { id } = await params;
-  const sale = getCatSalesForUser("user-1").find((s) => s.id === id);
+  const session = await getSession();
+  if (!session) redirect("/login");
 
-  if (!sale) notFound();
+  const { id } = await params;
+
+  let sale;
+  try {
+    sale = await getSale(session.user.id, id);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "NOT_FOUND") notFound();
+    throw error;
+  }
+
+  if (sale.status === "sold") {
+    redirect("/breeding");
+  }
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -25,7 +37,9 @@ export default async function EditSalePage({ params }: EditSalePageProps) {
           <span className="material-symbols-outlined text-lg">arrow_back</span>
           Kembali ke Penjualan
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-on-surface">Edit Penjualan</h1>
+        <h1 className="mt-2 text-2xl font-bold text-on-surface">
+          Edit Penjualan
+        </h1>
         <p className="mt-1 text-text-muted">{sale.catName}</p>
       </div>
 

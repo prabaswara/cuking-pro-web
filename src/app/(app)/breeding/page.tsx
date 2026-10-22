@@ -1,32 +1,21 @@
-"use client";
-
-import { useState, useSyncExternalStore } from "react";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { HeatCycleList } from "@/components/breeding/heat-cycle-list";
-import { MatingList } from "@/components/breeding/mating-list";
-import { SalesList } from "@/components/penjualan/sales-list";
+import { BreedingTabs } from "@/components/breeding/breeding-tabs";
+import { listCats } from "@/lib/cats";
+import { listHeatCycles } from "@/lib/heat-cycles";
+import { listMatings } from "@/lib/matings";
+import { listSales } from "@/lib/sales";
+import { getOrCreateProfile } from "@/lib/profile";
+import { getSession } from "@/lib/session";
 
-const subscribe = () => () => {};
+export default async function BreedingPage() {
+  const session = await getSession();
+  if (!session) redirect("/login");
 
-function readFlag(key: string): string {
-  if (typeof window === "undefined") return "false";
-  try {
-    return localStorage.getItem(key) === "true" ? "true" : "false";
-  } catch {
-    return "false";
-  }
-}
+  const userId = session.user.id;
+  const profile = await getOrCreateProfile(userId);
 
-export default function BreedingPage() {
-  const [activeTab, setActiveTab] = useState<"birahi" | "kawin" | "penjualan">("birahi");
-  const isBreeder =
-    useSyncExternalStore(
-      subscribe,
-      () => readFlag("cukingpro:isBreeder"),
-      () => "false",
-    ) === "true";
-
-  if (!isBreeder) {
+  if (!profile.isBreeder) {
     return (
       <div className="space-y-6">
         <div>
@@ -38,12 +27,20 @@ export default function BreedingPage() {
 
         <div className="rounded-3xl border-sand-border bg-surface-card p-8 text-center shadow-warm-sm">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-lavender-subtle">
-            <span className="material-symbols-outlined text-3xl text-tertiary">pets</span>
+            <span className="material-symbols-outlined text-3xl text-tertiary">
+              pets
+            </span>
           </div>
-          <h2 className="text-xl font-bold text-on-surface">Fitur Breeding Tersembunyi</h2>
-          <p className="mt-2 max-w-md mx-auto text-text-muted">
-            Aktifkan peran &ldquo;Saya Breeder&rdquo; di <Link href="/profil" className="text-primary underline">Profil</Link>
-            untuk mengakses fitur pencatatan birahi, kawin, kehamilan, dan kelahiran.
+          <h2 className="text-xl font-bold text-on-surface">
+            Fitur Breeding Tersembunyi
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-text-muted">
+            Aktifkan peran &ldquo;Saya Breeder&rdquo; di{" "}
+            <Link href="/profil" className="text-primary underline">
+              Profil
+            </Link>{" "}
+            untuk mengakses fitur pencatatan birahi, kawin, kehamilan, dan
+            kelahiran.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
             <Link href="/profil">
@@ -57,64 +54,45 @@ export default function BreedingPage() {
     );
   }
 
+  const [cats, heatCycles, matings, sales] = await Promise.all([
+    listCats(userId, { status: "all" }),
+    listHeatCycles(userId),
+    listMatings(userId),
+    listSales(userId),
+  ]);
+
+  const tracked = cats.filter(
+    (cat) => cat.status === "active" && cat.trackingStatus === "tracked",
+  );
+
+  const toOption = (cat: (typeof tracked)[number]) => ({
+    id: cat.id,
+    name: cat.name,
+    sex: cat.sex,
+    breed: cat.breed,
+    sireId: cat.sireId,
+    damId: cat.damId,
+  });
+
+  const females = tracked
+    .filter((cat) => cat.sex === "female")
+    .map(toOption);
+  const males = tracked.filter((cat) => cat.sex === "male").map(toOption);
+  const saleCats = tracked.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    photoPath: cat.photoPath,
+  }));
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-on-surface">Breeding</h1>
-        <p className="mt-1 text-text-muted">
-          Kelola siklus birahi, kawin, kehamilan, dan kelahiran kucing
-        </p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setActiveTab("birahi")}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-            activeTab === "birahi"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "bg-surface-card text-text-muted shadow-sm"
-          }`}
-        >
-          Siklus Birahi
-        </button>
-        <button
-          onClick={() => setActiveTab("kawin")}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-            activeTab === "kawin"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "bg-surface-card text-text-muted shadow-sm"
-          }`}
-        >
-          Kawin & Kehamilan
-        </button>
-        <button
-          onClick={() => setActiveTab("penjualan")}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-            activeTab === "penjualan"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "bg-surface-card text-text-muted shadow-sm"
-          }`}
-        >
-          Penjualan
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "birahi" && (
-        <div className="grid gap-6 md:grid-cols-2">
-          <HeatCycleList catId="cat-mochi" catName="Mochi" />
-          <HeatCycleList catId="cat-luna" catName="Luna" />
-        </div>
-      )}
-
-      {activeTab === "kawin" && (
-        <MatingList userId="user-1" />
-      )}
-
-      {activeTab === "penjualan" && (
-        <SalesList userId="user-1" />
-      )}
-    </div>
+    <BreedingTabs
+      heatCycles={heatCycles}
+      matings={matings}
+      sales={sales}
+      summary={sales.summary}
+      females={females}
+      males={males}
+      saleCats={saleCats}
+    />
   );
 }

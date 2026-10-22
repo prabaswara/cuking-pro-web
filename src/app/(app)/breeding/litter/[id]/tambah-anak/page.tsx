@@ -1,8 +1,9 @@
-import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { mockLitters, getMating, getQueenDisplayName, getSireDisplayName } from "@/lib/mock";
-import { formatDateID } from "@/lib/mock";
+import { ApiError } from "@/lib/api-error";
+import { formatDateID } from "@/lib/date";
+import { getLitter } from "@/lib/litters";
+import { getSession } from "@/lib/session";
 import { TambahAnakForm } from "./TambahAnakForm";
 
 interface TambahAnakPageProps {
@@ -10,15 +11,22 @@ interface TambahAnakPageProps {
 }
 
 export default async function TambahAnakPage({ params }: TambahAnakPageProps) {
-  await connection();
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   const { id } = await params;
-  const litter = mockLitters.find((l) => l.id === id);
 
-  if (!litter) notFound();
+  let litter;
+  try {
+    litter = await getLitter(session.user.id, id);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "NOT_FOUND") notFound();
+    throw error;
+  }
 
-  const mating = getMating(litter.matingId);
-  const queenName = mating ? getQueenDisplayName(mating) : "Ibu";
-  const sireName = mating ? getSireDisplayName(mating) : "Ayah";
+  if (litter.kittens.length >= litter.totalAlive) {
+    redirect(`/breeding/litter/${litter.id}`);
+  }
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -34,11 +42,19 @@ export default async function TambahAnakPage({ params }: TambahAnakPageProps) {
           Tambah Anak Kucing
         </h1>
         <p className="mt-1 text-text-muted">
-          Litter {queenName} × {sireName} • Lahir {formatDateID(litter.birthDate)}
+          Litter lahir {formatDateID(litter.birthDate)} • {litter.totalAlive}{" "}
+          anak hidup
         </p>
       </div>
 
-      <TambahAnakForm litterId={litter.id} totalAlive={litter.totalAlive} queenName={queenName} sireName={sireName} />
+      <TambahAnakForm
+        litterId={litter.id}
+        litterBirthDate={litter.birthDate}
+        totalAlive={litter.totalAlive}
+        registeredCount={litter.kittens.length}
+        queenName={litter.queenName}
+        sireName={litter.sireName}
+      />
     </div>
   );
 }
