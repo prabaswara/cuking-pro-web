@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { BeratContent } from "@/components/berat/berat-content";
-import { getMockCat } from "@/lib/mock";
+import { getCat } from "@/lib/cats";
+import { listWeights } from "@/lib/health";
+import { getSession } from "@/lib/session";
 
 interface BeratPageProps {
   params: Promise<{ id: string }>;
@@ -11,11 +13,21 @@ interface BeratPageProps {
 export default async function BeratPage({ params }: BeratPageProps) {
   await connection();
   const { id } = await params;
-  const cat = getMockCat(id);
 
-  if (!cat) {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  let cat;
+  try {
+    cat = await getCat(session.user.id, id);
+  } catch {
     notFound();
   }
+
+  const { items, lockedCount, windowStart } = await listWeights(
+    session.user.id,
+    id,
+  );
 
   return (
     <div className="space-y-6">
@@ -33,7 +45,14 @@ export default async function BeratPage({ params }: BeratPageProps) {
         <p className="mt-1 text-text-muted">Pantau pertumbuhan berat badan</p>
       </div>
 
-      <BeratContent catId={id} />
+      <BeratContent
+        catId={id}
+        catName={cat.name}
+        initialWeights={items}
+        lockedCount={lockedCount}
+        windowStart={windowStart}
+        frozen={cat.trackingStatus === "frozen"}
+      />
     </div>
   );
 }

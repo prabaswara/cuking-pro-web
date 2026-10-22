@@ -3,22 +3,38 @@ import { Button } from "@/components/ui/button";
 import { OnboardingBanner } from "@/components/onboarding/onboarding-banner";
 import Link from "next/link";
 import { connection } from "next/server";
-import { formatDateID, getCatName, mockCats, mockMatings, mockReminders } from "@/lib/mock";
+import { redirect } from "next/navigation";
+import { listCats } from "@/lib/cats";
+import { formatDateID } from "@/lib/date";
+import { listUpcomingReminders } from "@/lib/reminders";
+import { getSession } from "@/lib/session";
 
 export default async function DashboardPage() {
   await connection();
 
-  const totalCats = mockCats.length;
-  const activeCats = mockCats.filter((c) => c.status === "active").length;
-  const pregnantQueens = mockMatings.filter((m) => m.outcome === "pregnant").length;
-  const upcomingReminders = mockReminders.filter((r) => !r.doneAt).slice(0, 3);
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const [cats, upcomingReminders] = await Promise.all([
+    listCats(session.user.id, { status: "all" }),
+    listUpcomingReminders(session.user.id, 7),
+  ]);
+
+  const totalCats = cats.length;
+  const activeCats = cats.filter((c) => c.status === "active").length;
+  const firstActiveCat = cats.find(
+    (c) => c.status === "active" && c.trackingStatus === "tracked",
+  );
+  const quickCatId = firstActiveCat?.id;
+  const quickActionHref = (suffix: string) =>
+    quickCatId ? `/kucing/${quickCatId}/${suffix}` : "/kucing/tambah";
 
   return (
     <div className="space-y-6">
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-bold text-on-surface">
-          Selamat Pagi, Pengguna! 🐾
+          Selamat Pagi, {session.user.name}! 🐾
         </h1>
         <p className="mt-1 text-text-muted">
           Semua anabulmu dalam kondisi prima hari ini.
@@ -61,16 +77,16 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/breeding" className="block">
+        <Link href="/pengingat" className="block">
           <Card className="rounded-2xl border-sand-border shadow-warm-sm transition-all hover:shadow-warm-md active:scale-[0.98]">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lavender-subtle">
-                  <span className="material-symbols-outlined text-xl text-tertiary">favorite</span>
+                  <span className="material-symbols-outlined text-xl text-tertiary">notifications</span>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-on-surface">{pregnantQueens}</p>
-                  <p className="text-xs text-text-muted">Hamil (Queen)</p>
+                  <p className="text-2xl font-bold text-on-surface">{upcomingReminders.length}</p>
+                  <p className="text-xs text-text-muted">Pengingat 7 Hari</p>
                 </div>
               </div>
             </CardContent>
@@ -103,7 +119,7 @@ export default async function DashboardPage() {
         <CardContent>
           <div className="grid grid-cols-4 gap-3">
             <Link
-              href="/kucing/cat-mochi/berat"
+              href={quickActionHref("berat")}
               className="flex flex-col items-center gap-2 rounded-2xl bg-surface-container-low p-4 transition-transform active:scale-95"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-subtle">
@@ -113,7 +129,7 @@ export default async function DashboardPage() {
             </Link>
 
             <Link
-              href="/kucing/cat-mochi/pakan/tambah"
+              href={quickActionHref("pakan/tambah")}
               className="flex flex-col items-center gap-2 rounded-2xl bg-surface-container-low p-4 transition-transform active:scale-95"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-tangerine-subtle">
@@ -133,7 +149,7 @@ export default async function DashboardPage() {
             </Link>
 
             <Link
-              href="/kucing/cat-mochi/kesehatan/tambah"
+              href={quickActionHref("kesehatan/tambah")}
               className="flex flex-col items-center gap-2 rounded-2xl bg-surface-container-low p-4 transition-transform active:scale-95"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-lavender-subtle">
@@ -169,7 +185,7 @@ export default async function DashboardPage() {
                 <div className="absolute bottom-0 left-0 top-0 w-1.5 bg-honey-amber" />
                 <div className="min-w-0 pl-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-on-surface">{getCatName(r.catId)}</span>
+                    <span className="font-bold text-on-surface">{r.catName ?? "Umum"}</span>
                     <span className="truncate text-sm text-text-muted">• {r.title}</span>
                   </div>
                   <span className="text-sm text-text-muted">{formatDateID(r.dueDate)}</span>

@@ -1,12 +1,33 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  documentCategoryLabel,
-  getCatDocuments,
-} from "@/lib/mock";
-import type { CatDocument } from "@/types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { formatDateID } from "@/lib/date";
+import { documentCategoryLabel } from "@/lib/labels";
+
+type DocumentCategory =
+  | "pedigree"
+  | "vaccine_book"
+  | "lab"
+  | "registration"
+  | "other";
+
+type DocumentItem = {
+  id: string;
+  title: string;
+  category: DocumentCategory;
+  filePath: string | null;
+  fileType: "pdf" | "image";
+  sizeBytes: number | null;
+  uploadedAt: string;
+  source: string | null;
+  notes: string | null;
+  verified: boolean;
+};
 
 const FILTERS = [
   { value: "all", label: "Semua" },
@@ -16,7 +37,7 @@ const FILTERS = [
   { value: "registration", label: "Registrasi" },
 ] as const;
 
-const CATEGORY_ICON: Record<CatDocument["category"], string> = {
+const CATEGORY_ICON: Record<DocumentCategory, string> = {
   pedigree: "workspace_premium",
   vaccine_book: "vaccines",
   lab: "biotech",
@@ -24,7 +45,7 @@ const CATEGORY_ICON: Record<CatDocument["category"], string> = {
   other: "history_edu",
 };
 
-const CATEGORY_STYLE: Record<CatDocument["category"], string> = {
+const CATEGORY_STYLE: Record<DocumentCategory, string> = {
   pedigree: "bg-amber-subtle text-honey-amber",
   vaccine_book: "bg-amber-subtle text-honey-amber",
   lab: "bg-tertiary-fixed text-tertiary",
@@ -32,16 +53,60 @@ const CATEGORY_STYLE: Record<CatDocument["category"], string> = {
   other: "bg-surface-container text-on-surface-variant",
 };
 
+const CATEGORY_OPTIONS: { value: DocumentCategory; label: string }[] = [
+  { value: "pedigree", label: "Pedigree" },
+  { value: "vaccine_book", label: "Buku Vaksin" },
+  { value: "lab", label: "Hasil Lab / USG" },
+  { value: "registration", label: "Registrasi" },
+  { value: "other", label: "Lainnya" },
+];
+
 interface DocumentListProps {
   catId: string;
   catName: string;
+  initialDocuments: DocumentItem[];
+  lockedCount: number;
+  windowStart: string | null;
+  frozen: boolean;
 }
 
-export function DocumentList({ catId, catName }: DocumentListProps) {
+function readApiError(data: unknown): string {
+  return (
+    (data as { error?: { message?: string } })?.error?.message ??
+    "Terjadi kesalahan. Silakan coba lagi."
+  );
+}
+
+function sizeLabel(bytes: number | null): string {
+  if (bytes == null) return "Ukuran tidak diketahui";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function DocumentList({
+  catId,
+  catName,
+  initialDocuments,
+  lockedCount,
+  windowStart,
+  frozen,
+}: DocumentListProps) {
   const [filter, setFilter] = useState<string>("all");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [documents, setDocuments] = useState<DocumentItem[]>(initialDocuments);
+  const [deleting, setDeleting] = useState<DocumentItem | null>(null);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState<DocumentCategory>("other");
+  const [file, setFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const documents = useMemo(() => getCatDocuments(catId), [catId]);
   const visible =
     filter === "all"
       ? documents
@@ -55,6 +120,104 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
     return map;
   }, [documents]);
 
+  const totalBytes = documents.reduce((sum, doc) => sum + (doc.sizeBytes ?? 0), 0);
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      setError("Judul dokumen wajib diisi.");
+      return;
+    }
+    if (!file) {
+      setError("Pilih berkas terlebih dahulu.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadResponse = await fetch("/api/uploads/documents", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadResponse.json().catch(() => null);
+
+      if (!uploadResponse.ok) {
+        setError(readApiError(uploadData));
+        return;
+      }
+
+      const stored = uploadData as {
+        path: string;
+        size: number;
+        fileType: "pdf" | "image";
+      };
+
+      const response = await fetch(`/api/cats/${catId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          category,
+          filePath: stored.path,
+          fileType: stored.fileType,
+          sizeBytes: stored.size,
+          uploadedAt: todayStr(),
+          notes: notes.trim() || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setError(readApiError(data));
+        return;
+      }
+
+      const created = (data as { document: DocumentItem }).document;
+      setDocuments((prev) => [created, ...prev]);
+      setUploadOpen(false);
+      setTitle("");
+      setCategory("other");
+      setFile(null);
+      setNotes("");
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleting) return;
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/documents/${deleting.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setError(readApiError(data));
+        return;
+      }
+
+      setDocuments((prev) => prev.filter((doc) => doc.id !== deleting.id));
+      setDeleting(null);
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Brankas */}
@@ -67,7 +230,7 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
             <div>
               <h3 className="text-base font-bold text-on-surface">Brankas Anabul</h3>
               <p className="text-sm text-text-muted">
-                Cloud terenkripsi &amp; sinkron otomatis
+                Berkas privat, hanya bisa diakses pemilik akun
               </p>
             </div>
           </div>
@@ -76,9 +239,9 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
               className="material-symbols-outlined text-sm"
               style={{ fontVariationSettings: "'FILL' 1" }}
             >
-              verified
+              verified_user
             </span>
-            CFA &amp; ICA Valid
+            Akses privat
           </span>
         </div>
 
@@ -103,23 +266,52 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
               </span>
             </div>
             <p className="mt-1 text-xl font-bold text-on-surface">
-              10.3 <span className="text-sm font-normal text-text-muted">MB terpakai</span>
+              {sizeLabel(totalBytes)}
             </p>
           </div>
         </div>
       </section>
 
+      {frozen && (
+        <p className="rounded-2xl bg-amber-subtle p-3 text-sm text-on-surface">
+          Kucing ini dibekukan karena batas paket Free. Dokumen hanya-baca.{" "}
+          <Link href="/paket" className="font-semibold text-primary underline">
+            Upgrade ke Pro
+          </Link>
+        </p>
+      )}
+
+      {lockedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-lavender-subtle p-3 text-sm text-tertiary">
+          <span>
+            <strong>{lockedCount} dokumen terkunci</strong>
+            {windowStart ? ` — unggahan sebelum ${windowStart} hanya untuk Pro.` : "."}
+          </span>
+          <Link href="/paket" className="shrink-0 font-semibold underline">
+            Upgrade
+          </Link>
+        </div>
+      )}
+
+      {error && (
+        <p className="rounded-xl bg-error-container p-3 text-sm text-error">{error}</p>
+      )}
+
       {/* Actions */}
       <div className="grid grid-cols-2 gap-3">
         <Button
           type="button"
-          onClick={() => setUploadOpen(true)}
+          onClick={() => {
+            setUploadOpen(true);
+            setError(null);
+          }}
+          disabled={frozen}
           className="h-12 rounded-full"
         >
           <span className="material-symbols-outlined mr-2 text-xl">add_circle</span>
           Unggah Berkas
         </Button>
-        <Button type="button" variant="outline" className="h-12 rounded-full">
+        <Button type="button" variant="outline" disabled className="h-12 rounded-full">
           <span className="material-symbols-outlined mr-2 text-xl">archive</span>
           Unduh ZIP
         </Button>
@@ -148,8 +340,7 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
                     : "bg-surface-card text-text-muted shadow-sm hover:text-on-surface"
                 }`}
               >
-                {f.label}
-                {f.value === "all" ? ` (${count})` : ` (${count})`}
+                {f.label} ({count})
               </button>
             );
           })}
@@ -176,7 +367,7 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
                   {doc.title}
                 </h4>
                 <p className="mt-0.5 truncate text-sm text-text-muted">
-                  {formatUploadedAt(doc.uploadedAt)} • {doc.sizeLabel}
+                  {formatDateID(doc.uploadedAt)} • {sizeLabel(doc.sizeBytes)}
                   {doc.source ? ` • ${doc.source}` : ""}
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
@@ -187,7 +378,7 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
                         : "bg-surface-container-low text-on-surface-variant"
                     }`}
                   >
-                    {doc.statusLabel}
+                    {doc.verified ? "Terverifikasi" : "Belum diverifikasi"}
                   </span>
                   <span className="text-[11px] text-text-muted">
                     {documentCategoryLabel(doc.category)}
@@ -195,20 +386,34 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Unduh"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-on-surface transition-all hover:text-primary active:scale-90"
-                >
-                  <span className="material-symbols-outlined text-xl">download</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Menu"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-on-surface transition-all active:scale-90"
-                >
-                  <span className="material-symbols-outlined text-xl">more_vert</span>
-                </button>
+                {doc.filePath ? (
+                  <a
+                    href={doc.filePath}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Buka dokumen"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-on-surface transition-all hover:text-primary active:scale-90"
+                  >
+                    <span className="material-symbols-outlined text-xl">download</span>
+                  </a>
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-text-muted">
+                    <span className="material-symbols-outlined text-xl">attach_file</span>
+                  </span>
+                )}
+                {!frozen && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleting(doc);
+                      setError(null);
+                    }}
+                    aria-label="Hapus dokumen"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-text-muted transition-all hover:text-error active:scale-90"
+                  >
+                    <span className="material-symbols-outlined text-xl">delete</span>
+                  </button>
+                )}
               </div>
             </article>
           ))}
@@ -225,14 +430,16 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
             Tidak ada dokumen pada kategori ini. Unggah sertifikat, buku vaksin,
             atau hasil lab {catName}.
           </p>
-          <Button
-            type="button"
-            onClick={() => setUploadOpen(true)}
-            className="mt-4 h-10 rounded-full px-4"
-          >
-            <span className="material-symbols-outlined mr-1 text-xl">add</span>
-            Unggah Berkas
-          </Button>
+          {!frozen && (
+            <Button
+              type="button"
+              onClick={() => setUploadOpen(true)}
+              className="mt-4 h-10 rounded-full px-4"
+            >
+              <span className="material-symbols-outlined mr-1 text-xl">add</span>
+              Unggah Berkas
+            </Button>
+          )}
         </div>
       )}
 
@@ -242,20 +449,21 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
           tips_and_updates
         </span>
         <div className="space-y-1">
-          <p className="text-sm font-bold text-on-surface">
-            Integrasi Registrasi Kitten Baru
-          </p>
+          <p className="text-sm font-bold text-on-surface">Simpan Salinan Digital</p>
           <p className="text-sm text-on-surface-variant">
-            Dokumen {catName} dapat ditautkan langsung saat pengajuan sertifikasi
-            litter baru CFA/ICA tanpa perlu unggah ulang.
+            Dokumen {catName} tersimpan privat. Aplikasi tidak memverifikasi
+            keaslian pedigree atau sertifikat.
           </p>
         </div>
       </aside>
 
-      {/* Upload modal (placeholder) */}
+      {/* Upload modal */}
       {uploadOpen && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-inverse-surface/40 p-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-sm space-y-4 rounded-3xl bg-surface-card p-6 shadow-2xl">
+          <form
+            onSubmit={handleUpload}
+            className="w-full max-w-sm space-y-4 rounded-3xl bg-surface-card p-6 shadow-2xl"
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-on-surface">
                 Unggah Dokumen {catName}
@@ -269,62 +477,109 @@ export function DocumentList({ catId, catName }: DocumentListProps) {
               </button>
             </div>
 
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-2xl bg-surface-container-low p-4 text-left transition-colors active:bg-surface-container"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <span className="material-symbols-outlined text-2xl">
-                  photo_camera
-                </span>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-on-surface">
-                  Pindai / Ambil Foto
-                </p>
-                <p className="text-sm text-text-muted">
-                  Kamera pemindai sertifikat cerdas
-                </p>
-              </div>
-            </button>
+            <div className="space-y-1">
+              <Label htmlFor="doc-title">Judul Dokumen *</Label>
+              <Input
+                id="doc-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="cth: Sertifikat Pedigree CFA"
+                className="h-12 rounded-2xl border-sand-border"
+              />
+            </div>
 
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-2xl bg-surface-container-low p-4 text-left transition-colors active:bg-surface-container"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-secondary">
-                <span className="material-symbols-outlined text-2xl">
-                  upload_file
-                </span>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-on-surface">
-                  Pilih File Dokumen (PDF / JPG)
-                </p>
-                <p className="text-sm text-text-muted">Maksimal 15MB per berkas</p>
-              </div>
-            </button>
+            <div className="space-y-1">
+              <Label htmlFor="doc-category">Kategori</Label>
+              <select
+                id="doc-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as DocumentCategory)}
+                className="h-12 w-full rounded-2xl border-sand-border bg-surface-card px-4 text-on-surface"
+              >
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setUploadOpen(false)}
-              className="h-12 w-full rounded-full"
-            >
-              Batal
-            </Button>
+            <div className="space-y-1">
+              <Label htmlFor="doc-file">Berkas (PDF / JPG / PNG, maks. 15 MB)</Label>
+              <input
+                id="doc-file"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="w-full rounded-2xl border border-sand-border bg-surface-card p-3 text-sm text-on-surface"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="doc-notes">Catatan (opsional)</Label>
+              <Textarea
+                id="doc-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                className="rounded-2xl border-sand-border"
+              />
+            </div>
+
+            {error && (
+              <p className="rounded-xl bg-error-container p-3 text-sm text-error">
+                {error}
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setUploadOpen(false)}
+                disabled={isSaving}
+                className="h-12 flex-1 rounded-full"
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={isSaving} className="h-12 flex-1 rounded-full">
+                {isSaving ? "Mengunggah..." : "Unggah"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleting && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-inverse-surface/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl bg-surface-card p-6 shadow-2xl">
+            <h3 className="font-bold text-on-surface">Hapus Dokumen?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              &ldquo;{deleting.title}&rdquo; akan dihapus permanen dari brankas.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeleting(null)}
+                disabled={isSaving}
+                className="h-12 flex-1 rounded-full"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving}
+                className="h-12 flex-1 rounded-full bg-error text-white hover:bg-error/90"
+              >
+                {isSaving ? "Menghapus..." : "Hapus"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function formatUploadedAt(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }

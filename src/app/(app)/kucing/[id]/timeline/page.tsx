@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { TimelineList } from "@/components/kucing/timeline-list";
-import { getMockCat } from "@/lib/mock";
+import { getCat } from "@/lib/cats";
+import { getSession } from "@/lib/session";
+import { getCatTimeline } from "@/lib/timeline";
 
 interface TimelinePageProps {
   params: Promise<{ id: string }>;
@@ -11,11 +13,21 @@ interface TimelinePageProps {
 export default async function TimelinePage({ params }: TimelinePageProps) {
   await connection();
   const { id } = await params;
-  const cat = getMockCat(id);
 
-  if (!cat) {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  let cat;
+  try {
+    cat = await getCat(session.user.id, id);
+  } catch {
     notFound();
   }
+
+  const { items, lockedCount, windowStart } = await getCatTimeline(
+    session.user.id,
+    id,
+  );
 
   return (
     <div className="space-y-6">
@@ -35,7 +47,13 @@ export default async function TimelinePage({ params }: TimelinePageProps) {
         </p>
       </div>
 
-      <TimelineList catId={id} catName={cat.name} />
+      <TimelineList
+        catId={id}
+        catName={cat.name}
+        initialEvents={items}
+        lockedCount={lockedCount}
+        windowStart={windowStart}
+      />
     </div>
   );
 }

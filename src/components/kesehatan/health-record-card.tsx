@@ -1,5 +1,6 @@
 import type { HealthRecord } from "@/types";
-import { formatDateID, formatRupiah, healthTypeLabel } from "@/lib/mock";
+import { formatDateID, formatRupiah } from "@/lib/date";
+import { healthTypeLabel } from "@/lib/labels";
 
 const TYPE_STYLE: Record<HealthRecord["type"], { bg: string; text: string; icon: string }> = {
   vaccine: { bg: "bg-tangerine-subtle", text: "text-primary", icon: "vaccines" },

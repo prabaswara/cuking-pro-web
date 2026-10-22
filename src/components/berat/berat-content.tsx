@@ -1,30 +1,188 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WeightChart } from "@/components/berat/weight-chart";
-import { formatDateID, getCatName, mockWeights } from "@/lib/mock";
+import { formatDateID } from "@/lib/date";
+import type { WeightEntry } from "@/lib/health";
 
-export function BeratContent({ catId }: { catId: string }) {
+interface BeratContentProps {
+  catId: string;
+  catName: string;
+  initialWeights: WeightEntry[];
+  lockedCount: number;
+  windowStart: string | null;
+  frozen: boolean;
+}
+
+function readApiError(data: unknown): { message: string; field?: string } {
+  const error = (data as { error?: { message?: string; field?: string } })?.error;
+  return {
+    message: error?.message ?? "Terjadi kesalahan. Silakan coba lagi.",
+    field: error?.field,
+  };
+}
+
+export function BeratContent({
+  catId,
+  catName,
+  initialWeights,
+  lockedCount,
+  windowStart,
+  frozen,
+}: BeratContentProps) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editKg, setEditKg] = useState("");
   const [editNote, setEditNote] = useState("");
-  const catName = getCatName(catId);
-
-  const [weights, setWeights] = useState(() =>
-    mockWeights
-      .filter((w) => w.catId === catId)
-      .sort((a, b) => b.date.localeCompare(a.date))
+  const [newKg, setNewKg] = useState("");
+  const [newDate, setNewDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newNote, setNewNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [weights, setWeights] = useState<WeightEntry[]>(() =>
+    [...initialWeights].sort((a, b) => b.date.localeCompare(a.date)),
   );
   const latest = weights[0];
 
+  async function handleCreate() {
+    const kg = Number(newKg);
+    if (!newKg || !Number.isFinite(kg) || kg <= 0 || kg > 20) {
+      setError("Berat harus lebih dari 0 dan maksimal 20 kg.");
+      return;
+    }
+    if (!newDate) {
+      setError("Tanggal timbang wajib diisi.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/cats/${catId}/weights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weightKg: kg,
+          recordDate: newDate,
+          notes: newNote.trim() || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setError(readApiError(data).message);
+        return;
+      }
+
+      const weight = (data as { weight: WeightEntry }).weight;
+      setWeights((prev) =>
+        [...prev, weight].sort((a, b) => b.date.localeCompare(a.date)),
+      );
+      setSaved(true);
+      setNewKg("");
+      setNewNote("");
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleUpdate() {
+    if (!editing) return;
+    const kg = Number(editKg);
+    if (!Number.isFinite(kg) || kg <= 0 || kg > 20) {
+      setError("Berat harus lebih dari 0 dan maksimal 20 kg.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/weights/${editing}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weightKg: kg, notes: editNote.trim() || null }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setError(readApiError(data).message);
+        return;
+      }
+
+      const weight = (data as { weight: WeightEntry }).weight;
+      setWeights((prev) => prev.map((w) => (w.id === weight.id ? weight : w)));
+      setEditing(null);
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleting) return;
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/weights/${deleting}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setError(readApiError(data).message);
+        return;
+      }
+
+      setWeights((prev) => prev.filter((w) => w.id !== deleting));
+      setDeleting(null);
+    } catch {
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {frozen && (
+        <p className="rounded-2xl bg-amber-subtle p-3 text-sm text-on-surface">
+          Kucing ini dibekukan karena batas paket Free. Data berat hanya-baca.{" "}
+          <Link href="/paket" className="font-semibold text-primary underline">
+            Upgrade ke Pro
+          </Link>
+        </p>
+      )}
+
+      {lockedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-lavender-subtle p-3 text-sm text-tertiary">
+          <span>
+            <strong>{lockedCount} data terkunci</strong>
+            {windowStart ? ` — riwayat sebelum ${windowStart} hanya untuk Pro.` : "."}
+          </span>
+          <Link href="/paket" className="shrink-0 font-semibold underline">
+            Upgrade
+          </Link>
+        </div>
+      )}
+
+      {error && (
+        <p className="rounded-xl bg-error-container p-3 text-sm text-error">{error}</p>
+      )}
+
       {/* Ringkasan */}
       {latest ? (
         <div className="rounded-3xl border border-sand-border bg-surface-card p-4 shadow-warm-sm">
@@ -55,21 +213,24 @@ export function BeratContent({ catId }: { catId: string }) {
         <h3 className="font-bold text-on-surface">Grafik Pertumbuhan</h3>
         <p className="text-sm text-text-muted">Tren penambahan berat badan</p>
         <div className="mt-2">
-          <WeightChart catId={catId} />
+          <WeightChart weights={weights} />
         </div>
       </div>
 
       {/* CTA */}
-      <Button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          setSaved(false);
-        }}
-        className="h-12 w-full rounded-full text-base font-semibold"
-      >
-        <span className="material-symbols-outlined mr-2 text-xl">scale</span>+ Catat Berat Badan
-      </Button>
+      {!frozen && (
+        <Button
+          type="button"
+          onClick={() => {
+            setOpen(true);
+            setSaved(false);
+            setError(null);
+          }}
+          className="h-12 w-full rounded-full text-base font-semibold"
+        >
+          <span className="material-symbols-outlined mr-2 text-xl">scale</span>+ Catat Berat Badan
+        </Button>
+      )}
 
       {/* Riwayat */}
       <div className="space-y-2">
@@ -104,26 +265,34 @@ export function BeratContent({ catId }: { catId: string }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing(w.id);
-                      setEditKg(w.kg.toString());
-                      setEditNote(w.note ?? "");
-                    }}
-                    aria-label="Edit"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-on-surface"
-                  >
-                    <span className="material-symbols-outlined text-lg">edit</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleting(w.id)}
-                    aria-label="Hapus"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-error-container hover:text-error"
-                  >
-                    <span className="material-symbols-outlined text-lg">delete</span>
-                  </button>
+                  {!frozen && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditing(w.id);
+                          setEditKg(w.kg.toString());
+                          setEditNote(w.note ?? "");
+                          setError(null);
+                        }}
+                        aria-label="Edit"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-on-surface"
+                      >
+                        <span className="material-symbols-outlined text-lg">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleting(w.id);
+                          setError(null);
+                        }}
+                        aria-label="Hapus"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-error-container hover:text-error"
+                      >
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                      </button>
+                    </>
+                  )}
                   {diff != null ? (
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-bold ${
@@ -178,13 +347,27 @@ export function BeratContent({ catId }: { catId: string }) {
                 </button>
               </div>
               {saved ? (
-                <div className="rounded-2xl bg-mint-subtle p-4 text-center">
-                  <p className="font-semibold text-secondary">
-                    Berat tersimpan! 🎉
-                  </p>
-                  <p className="text-sm text-secondary/80">
-                    (Demo — hubungkan ke API saat backend siap)
-                  </p>
+                <div className="space-y-3">
+                  <div className="rounded-2xl bg-mint-subtle p-4 text-center">
+                    <p className="font-semibold text-secondary">
+                      Berat tersimpan! 🎉
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSaved(false)}
+                    className="h-12 w-full rounded-full"
+                  >
+                    Catat Lagi
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="h-12 w-full rounded-full"
+                  >
+                    Selesai
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -196,7 +379,9 @@ export function BeratContent({ catId }: { catId: string }) {
                       step="0.05"
                       min="0.1"
                       max="20"
-                      defaultValue={latest ? latest.kg.toFixed(2) : "4.00"}
+                      value={newKg}
+                      onChange={(e) => setNewKg(e.target.value)}
+                      placeholder={latest ? latest.kg.toFixed(2) : "4.00"}
                       className="h-12 rounded-2xl border-sand-border"
                     />
                   </div>
@@ -205,6 +390,19 @@ export function BeratContent({ catId }: { catId: string }) {
                     <Input
                       id="quick-date"
                       type="date"
+                      value={newDate}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="h-12 rounded-2xl border-sand-border"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="quick-note">Catatan (opsional)</Label>
+                    <Input
+                      id="quick-note"
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      placeholder="cth: setelah vaksin, nafsu makan naik"
                       className="h-12 rounded-2xl border-sand-border"
                     />
                   </div>
@@ -213,16 +411,18 @@ export function BeratContent({ catId }: { catId: string }) {
                       type="button"
                       variant="outline"
                       onClick={() => setOpen(false)}
+                      disabled={isSaving}
                       className="h-12 flex-1 rounded-full"
                     >
                       Batal
                     </Button>
                     <Button
                       type="button"
-                      onClick={() => setSaved(true)}
+                      onClick={handleCreate}
+                      disabled={isSaving}
                       className="h-12 flex-1 rounded-full"
                     >
-                      Simpan Data
+                      {isSaving ? "Menyimpan..." : "Simpan Data"}
                     </Button>
                   </div>
                 </div>
@@ -268,21 +468,14 @@ export function BeratContent({ catId }: { catId: string }) {
                 />
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditing(null)} className="h-12 flex-1 rounded-full">Batal</Button>
+                <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={isSaving} className="h-12 flex-1 rounded-full">Batal</Button>
                 <Button
                   type="button"
-                  onClick={() => {
-                    const kg = parseFloat(editKg);
-                    if (kg > 0 && kg <= 20) {
-                      setWeights((prev) =>
-                        prev.map((w) => (w.id === editing ? { ...w, kg, note: editNote.trim() || undefined } : w))
-                      );
-                      setEditing(null);
-                    }
-                  }}
+                  onClick={handleUpdate}
+                  disabled={isSaving}
                   className="h-12 flex-1 rounded-full"
                 >
-                  Simpan
+                  {isSaving ? "Menyimpan..." : "Simpan"}
                 </Button>
               </div>
             </div>
@@ -299,16 +492,14 @@ export function BeratContent({ catId }: { catId: string }) {
               Catatan timbang badan ini akan dihapus permanen.
             </p>
             <div className="mt-6 flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setDeleting(null)} className="h-12 flex-1 rounded-full">Batal</Button>
+              <Button type="button" variant="outline" onClick={() => setDeleting(null)} disabled={isSaving} className="h-12 flex-1 rounded-full">Batal</Button>
               <Button
                 type="button"
-                onClick={() => {
-                  setWeights((prev) => prev.filter((w) => w.id !== deleting));
-                  setDeleting(null);
-                }}
+                onClick={handleDelete}
+                disabled={isSaving}
                 className="h-12 flex-1 rounded-full bg-error text-white hover:bg-error/90"
               >
-                Hapus
+                {isSaving ? "Menghapus..." : "Hapus"}
               </Button>
             </div>
           </div>

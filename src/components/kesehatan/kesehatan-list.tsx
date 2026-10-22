@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { HealthRecordCard } from "@/components/kesehatan/health-record-card";
-import { getCatName, mockHealthRecords } from "@/lib/mock";
 import type { HealthRecord } from "@/types";
 
 const FILTERS = [
@@ -16,17 +15,64 @@ const FILTERS = [
 
 interface KesehatanListProps {
   catId: string;
+  catName: string;
+  initialRecords: HealthRecord[];
+  lockedCount: number;
+  windowStart: string | null;
+  frozen: boolean;
 }
 
-export function KesehatanList({ catId }: KesehatanListProps) {
+function readApiError(data: unknown): { message: string; field?: string } {
+  const error = (data as { error?: { message?: string; field?: string } })?.error;
+  return {
+    message: error?.message ?? "Terjadi kesalahan. Silakan coba lagi.",
+    field: error?.field,
+  };
+}
+
+export function KesehatanList({
+  catId,
+  catName,
+  initialRecords,
+  lockedCount,
+  windowStart,
+  frozen,
+}: KesehatanListProps) {
   const [filter, setFilter] = useState<string>("semua");
-  const [records, setRecords] = useState(() => mockHealthRecords.filter((r) => r.catId === catId));
+  const [records, setRecords] = useState<HealthRecord[]>(initialRecords);
   const [editing, setEditing] = useState<HealthRecord | null>(null);
   const [deleting, setDeleting] = useState<HealthRecord | null>(null);
-  const catName = getCatName(catId);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const visible =
     filter === "semua" ? records : records.filter((r) => r.type === filter);
+
+  async function handleDelete() {
+    if (!deleting) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/health/${deleting.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setDeleteError(readApiError(data).message);
+        return;
+      }
+
+      setRecords((prev) => prev.filter((r) => r.id !== deleting.id));
+      setDeleting(null);
+    } catch {
+      setDeleteError("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -37,13 +83,37 @@ export function KesehatanList({ catId }: KesehatanListProps) {
             Riwayat tindakan klinis & pencegahan {catName}
           </p>
         </div>
-        <Link href={`/kucing/${catId}/kesehatan/tambah`}>
-          <Button className="h-10 rounded-full px-4">
-            <span className="material-symbols-outlined mr-1 text-xl">add</span>
-            Tambah
-          </Button>
-        </Link>
+        {!frozen && (
+          <Link href={`/kucing/${catId}/kesehatan/tambah`}>
+            <Button className="h-10 rounded-full px-4">
+              <span className="material-symbols-outlined mr-1 text-xl">add</span>
+              Tambah
+            </Button>
+          </Link>
+        )}
       </div>
+
+      {frozen && (
+        <p className="rounded-2xl bg-amber-subtle p-3 text-sm text-on-surface">
+          Kucing ini dibekukan karena batas paket Free. Data kesehatan bersifat
+          hanya-baca.{" "}
+          <Link href="/paket" className="font-semibold text-primary underline">
+            Upgrade ke Pro
+          </Link>
+        </p>
+      )}
+
+      {lockedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-lavender-subtle p-3 text-sm text-tertiary">
+          <span>
+            <strong>{lockedCount} data terkunci</strong>
+            {windowStart ? ` — riwayat sebelum ${windowStart} hanya untuk Pro.` : "."}
+          </span>
+          <Link href="/paket" className="shrink-0 font-semibold underline">
+            Upgrade
+          </Link>
+        </div>
+      )}
 
       {/* Filter chips */}
       <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 py-1">
@@ -71,8 +141,15 @@ export function KesehatanList({ catId }: KesehatanListProps) {
             <HealthRecordCard
               key={record.id}
               record={record}
-              onEdit={(r) => setEditing(r)}
-              onDelete={(r) => setDeleting(r)}
+              onEdit={frozen ? undefined : (r) => setEditing(r)}
+              onDelete={
+                frozen
+                  ? undefined
+                  : (r) => {
+                      setDeleteError(null);
+                      setDeleting(r);
+                    }
+              }
             />
           ))}
         </div>
@@ -88,9 +165,11 @@ export function KesehatanList({ catId }: KesehatanListProps) {
             Tidak ada catatan medis di kategori ini. Tambahkan riwayat baru
             untuk memantau kesehatan {catName}.
           </p>
-          <Link href={`/kucing/${catId}/kesehatan/tambah`} className="mt-4">
-            <Button className="h-10 rounded-full px-4">Tambah Catatan</Button>
-          </Link>
+          {!frozen && (
+            <Link href={`/kucing/${catId}/kesehatan/tambah`} className="mt-4">
+              <Button className="h-10 rounded-full px-4">Tambah Catatan</Button>
+            </Link>
+          )}
         </div>
       )}
 
@@ -103,7 +182,7 @@ export function KesehatanList({ catId }: KesehatanListProps) {
         <EditHealthRecordModal
           record={editing}
           onClose={() => setEditing(null)}
-          onSave={(updated) => {
+          onSaved={(updated) => {
             setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
             setEditing(null);
           }}
@@ -118,19 +197,28 @@ export function KesehatanList({ catId }: KesehatanListProps) {
             <p className="mt-2 text-sm text-on-surface-variant">
               Catatan &ldquo;{deleting.title ?? deleting.type}&rdquo; akan dihapus permanen. Pengingat terkait juga akan dihapus.
             </p>
+            {deleteError && (
+              <p className="mt-3 rounded-xl bg-error-container p-3 text-sm text-error">
+                {deleteError}
+              </p>
+            )}
             <div className="mt-6 flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setDeleting(null)} className="h-12 flex-1 rounded-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeleting(null)}
+                disabled={isDeleting}
+                className="h-12 flex-1 rounded-full"
+              >
                 Batal
               </Button>
               <Button
                 type="button"
-                onClick={() => {
-                  setRecords((prev) => prev.filter((r) => r.id !== deleting.id));
-                  setDeleting(null);
-                }}
+                onClick={handleDelete}
+                disabled={isDeleting}
                 className="h-12 flex-1 rounded-full bg-error text-white hover:bg-error/90"
               >
-                Hapus
+                {isDeleting ? "Menghapus..." : "Hapus"}
               </Button>
             </div>
           </div>
@@ -143,11 +231,11 @@ export function KesehatanList({ catId }: KesehatanListProps) {
 function EditHealthRecordModal({
   record,
   onClose,
-  onSave,
+  onSaved,
 }: {
   record: HealthRecord;
   onClose: () => void;
-  onSave: (record: HealthRecord) => void;
+  onSaved: (record: HealthRecord) => void;
 }) {
   const [title, setTitle] = useState(record.title ?? "");
   const [recordDate, setRecordDate] = useState(record.recordDate);
@@ -156,12 +244,16 @@ function EditHealthRecordModal({
   const [cost, setCost] = useState(record.cost?.toString() ?? "");
   const [notes, setNotes] = useState(record.notes ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   function todayStr() {
-    return new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const nextErrors: Record<string, string> = {};
     if (!recordDate) nextErrors.recordDate = "Tanggal wajib diisi";
@@ -171,16 +263,41 @@ function EditHealthRecordModal({
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
-    // TODO: PATCH /api/health-records/:id
-    onSave({
-      ...record,
-      title: title.trim() || null,
-      recordDate,
-      nextDueDate: nextDueDate || null,
-      vetName: vetName.trim() || null,
-      cost: cost ? parseInt(cost) : null,
-      notes: notes.trim() || null,
-    });
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`/api/health/${record.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim() || null,
+          recordDate,
+          nextDueDate: nextDueDate || null,
+          vetName: vetName.trim() || null,
+          cost: cost ? Number(cost) : null,
+          notes: notes.trim() || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const apiError = readApiError(data);
+        setErrors(
+          apiError.field
+            ? { [apiError.field]: apiError.message }
+            : { form: apiError.message },
+        );
+        return;
+      }
+
+      onSaved((data as { record: HealthRecord }).record);
+    } catch {
+      setErrors({ form: "Terjadi kesalahan. Silakan coba lagi." });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -260,12 +377,17 @@ function EditHealthRecordModal({
               className="w-full rounded-2xl border-sand-border px-4 py-3"
             />
           </div>
+          {errors.form && (
+            <p className="rounded-xl bg-error-container p-3 text-sm text-error">
+              {errors.form}
+            </p>
+          )}
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="h-12 flex-1 rounded-full">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 flex-1 rounded-full">
               Batal
             </Button>
-            <Button type="submit" className="h-12 flex-1 rounded-full">
-              Simpan Perubahan
+            <Button type="submit" disabled={isSaving} className="h-12 flex-1 rounded-full">
+              {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </div>
         </form>

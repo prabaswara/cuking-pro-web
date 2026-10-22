@@ -1,9 +1,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
-import { formatAge, formatDateID, getMockCat } from "@/lib/mock";
+import { getCat, getPedigree } from "@/lib/cats";
+import { formatAge, formatDateID } from "@/lib/date";
+import { listFeedingSchedules } from "@/lib/feeding";
+import { getLatestHealthRecord, getLatestWeight } from "@/lib/health";
+import { getSession } from "@/lib/session";
 
 interface KucingDetailPageProps {
   params: Promise<{
@@ -17,12 +21,23 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
 
   const { id } = await params;
 
-  // Mock untuk fase frontend — ganti dengan fetch /api/cats/:id saat backend siap
-  const cat = getMockCat(id);
+  const session = await getSession();
+  if (!session) redirect("/login");
 
-  if (!cat) {
+  let cat;
+  try {
+    cat = await getCat(session.user.id, id);
+  } catch {
     notFound();
   }
+
+  const [pedigree, latestWeight, latestVaccine, feedingSchedules] =
+    await Promise.all([
+      getPedigree(session.user.id, id),
+      getLatestWeight(session.user.id, id),
+      getLatestHealthRecord(session.user.id, id, "vaccine"),
+      listFeedingSchedules(session.user.id, id),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -186,13 +201,23 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl bg-surface-container-low p-4">
               <p className="text-xs text-text-muted">Berat Terakhir</p>
-              <p className="mt-1 text-2xl font-bold text-on-surface">4.2 kg</p>
-              <p className="text-xs text-secondary">Normal</p>
+              <p className="mt-1 text-2xl font-bold text-on-surface">
+                {latestWeight ? `${latestWeight.kg.toFixed(1)} kg` : "-"}
+              </p>
+              <p className="text-xs text-text-muted">
+                {latestWeight ? formatDateID(latestWeight.date) : "Belum ada data"}
+              </p>
             </div>
             <div className="rounded-2xl bg-surface-container-low p-4">
               <p className="text-xs text-text-muted">Vaksin Terakhir</p>
-              <p className="mt-1 text-lg font-semibold text-on-surface">Tricat Trio</p>
-              <p className="text-xs text-text-muted">12 Mei 2026</p>
+              <p className="mt-1 text-lg font-semibold text-on-surface">
+                {latestVaccine?.title ?? (latestVaccine ? "Vaksinasi" : "-")}
+              </p>
+              <p className="text-xs text-text-muted">
+                {latestVaccine
+                  ? formatDateID(latestVaccine.recordDate)
+                  : "Belum ada catatan"}
+              </p>
             </div>
           </div>
 
@@ -226,17 +251,72 @@ export default async function KucingDetailPage({ params }: KucingDetailPageProps
               <div className="flex justify-between gap-4">
                 <span className="text-sm text-text-muted">Induk</span>
                 <span className="text-right text-sm font-medium text-on-surface">
-                  {cat.damNameManual ?? "-"}
+                  {pedigree.dam?.name ?? "-"}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-sm text-text-muted">Ayah</span>
                 <span className="text-right text-sm font-medium text-on-surface">
-                  {cat.sireNameManual ?? "-"}
+                  {pedigree.sire?.name ?? "-"}
                 </span>
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Jadwal Pakan */}
+      <Card className="rounded-3xl border-sand-border shadow-warm-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Jadwal Pakan</CardTitle>
+              <CardDescription>Porsi dan waktu makan harian</CardDescription>
+            </div>
+            {cat.trackingStatus === "tracked" && (
+              <Link href={`/kucing/${cat.id}/pakan/tambah`}>
+                <Button size="sm" variant="outline" className="rounded-full">
+                  <span className="material-symbols-outlined mr-1 text-lg">add</span>
+                  Tambah
+                </Button>
+              </Link>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {feedingSchedules.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {feedingSchedules.map((schedule) => (
+                <div
+                  key={schedule.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-surface-container-low p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-subtle text-honey-amber">
+                      <span className="material-symbols-outlined text-lg">set_meal</span>
+                    </span>
+                    <div>
+                      <p className="font-semibold text-on-surface">
+                        {schedule.foodType}
+                      </p>
+                      <p className="text-sm text-text-muted">
+                        {schedule.portionGrams} gram
+                        {schedule.notes ? ` • ${schedule.notes}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-surface-card px-3 py-1 text-sm font-bold text-primary">
+                    {schedule.scheduleTime}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-surface-container-low p-6 text-center text-sm text-text-muted">
+              Belum ada jadwal pakan. Tambahkan agar porsi harian {cat.name}{" "}
+              tercatat.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

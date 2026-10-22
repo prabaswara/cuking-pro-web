@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCatName } from "@/lib/mock";
 
 const JENIS_OPTIONS = [
   { value: "vaccine", label: "Vaksin", icon: "vaccines" },
@@ -21,11 +20,11 @@ const JENIS_OPTIONS = [
 
 interface HealthFormProps {
   catId: string;
+  catName: string;
 }
 
-export function HealthForm({ catId }: HealthFormProps) {
+export function HealthForm({ catId, catName }: HealthFormProps) {
   const router = useRouter();
-  const catName = getCatName(catId);
   const [jenis, setJenis] = useState<string>("vaccine");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -40,8 +39,12 @@ export function HealthForm({ catId }: HealthFormProps) {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const title = String(formData.get("title") ?? "").trim();
     const recordDate = (formData.get("recordDate") as string) || "";
     const nextDueDate = (formData.get("nextDueDate") as string) || "";
+    const vetName = String(formData.get("vetName") ?? "").trim();
+    const cost = String(formData.get("cost") ?? "").trim();
+    const notes = String(formData.get("notes") ?? "").trim();
     const nextErrors: Record<string, string> = {};
 
     if (!recordDate) {
@@ -61,9 +64,41 @@ export function HealthForm({ catId }: HealthFormProps) {
     if (Object.keys(nextErrors).length > 0) return;
 
     setIsSaving(true);
-    // TODO: POST /api/cats/:id/health (dengan Zod di server)
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    router.push(`/kucing/${catId}/kesehatan`);
+
+    try {
+      const response = await fetch(`/api/cats/${catId}/health`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: jenis,
+          title: title || null,
+          recordDate,
+          nextDueDate: nextDueDate || null,
+          vetName: vetName || null,
+          cost: cost ? Number(cost) : null,
+          notes: notes || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const error = (data as { error?: { message?: string; field?: string } })?.error;
+        setErrors(
+          error?.field
+            ? { [error.field]: error.message ?? "Data tidak valid." }
+            : { form: error?.message ?? "Gagal menyimpan catatan." },
+        );
+        return;
+      }
+
+      router.push(`/kucing/${catId}/kesehatan`);
+      router.refresh();
+    } catch {
+      setErrors({ form: "Terjadi kesalahan. Silakan coba lagi." });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -206,6 +241,11 @@ export function HealthForm({ catId }: HealthFormProps) {
           </div>
 
           <div className="flex flex-col gap-3 pt-2">
+            {errors.form && (
+              <p className="rounded-xl bg-error-container p-3 text-sm text-error">
+                {errors.form}
+              </p>
+            )}
             <Button
               type="submit"
               disabled={isSaving}

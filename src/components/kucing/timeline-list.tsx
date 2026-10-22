@@ -1,13 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  daysUntil,
-  formatDateID,
-  getTimelineForCat,
-  timelineCategoryLabel,
-} from "@/lib/mock";
+import { daysUntil, formatDateID } from "@/lib/date";
 import type { TimelineCategory, TimelineEvent } from "@/types";
 
 const FILTERS: { value: TimelineCategory | "all"; label: string }[] = [
@@ -43,22 +39,51 @@ const CATEGORY_PILL: Record<TimelineCategory, string> = {
   note: "bg-mint-subtle text-secondary",
 };
 
+const CATEGORY_LABEL: Record<TimelineCategory, string> = {
+  medical: "Medis",
+  weight: "Berat",
+  feeding: "Pakan",
+  breeding: "Breeding",
+  note: "Catatan",
+};
+
 interface TimelineListProps {
   catId: string;
   catName: string;
+  initialEvents: TimelineEvent[];
+  lockedCount: number;
+  windowStart: string | null;
 }
 
-export function TimelineList({ catId, catName }: TimelineListProps) {
+export function TimelineList({
+  catId,
+  catName,
+  initialEvents,
+  lockedCount,
+  windowStart,
+}: TimelineListProps) {
   const [filter, setFilter] = useState<TimelineCategory | "all">("all");
   const [limit, setLimit] = useState(6);
 
-  const events = useMemo(() => getTimelineForCat(catId), [catId]);
+  const events = initialEvents;
   const visible =
     filter === "all" ? events : events.filter((e) => e.category === filter);
   const shown = visible.slice(0, limit);
 
   return (
     <div className="space-y-5">
+      {lockedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-lavender-subtle p-3 text-sm text-tertiary">
+          <span>
+            <strong>{lockedCount} catatan terkunci</strong>
+            {windowStart ? ` — riwayat sebelum ${windowStart} hanya untuk Pro.` : "."}
+          </span>
+          <Link href="/paket" className="shrink-0 font-semibold underline">
+            Upgrade
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
@@ -68,10 +93,12 @@ export function TimelineList({ catId, catName }: TimelineListProps) {
             </span>
             <h3 className="text-base font-bold text-on-surface">Riwayat &amp; Log</h3>
           </div>
-          <Button type="button" className="h-10 rounded-full px-4">
-            <span className="material-symbols-outlined mr-1 text-xl">add_circle</span>
-            Tambah Event
-          </Button>
+          <Link href={`/kucing/${catId}/kesehatan/tambah`}>
+            <Button type="button" className="h-10 rounded-full px-4">
+              <span className="material-symbols-outlined mr-1 text-xl">add_circle</span>
+              Tambah Catatan
+            </Button>
+          </Link>
         </div>
 
         <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 py-0.5">
@@ -135,10 +162,12 @@ export function TimelineList({ catId, catName }: TimelineListProps) {
             Belum ada catatan pada kategori ini untuk {catName}. Catat kegiatan
             harian, medis, atau breeding untuk mengisi linimasa.
           </p>
-          <Button type="button" className="mt-4 h-10 rounded-full px-4">
-            <span className="material-symbols-outlined mr-1 text-xl">add</span>
-            Tambah Event
-          </Button>
+          <Link href={`/kucing/${catId}/kesehatan/tambah`}>
+            <Button type="button" className="mt-4 h-10 rounded-full px-4">
+              <span className="material-symbols-outlined mr-1 text-xl">add</span>
+              Tambah Catatan
+            </Button>
+          </Link>
         </div>
       )}
     </div>
@@ -165,7 +194,7 @@ function TimelineItem({ event }: { event: TimelineEvent }) {
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-bold ${CATEGORY_PILL[event.category]}`}
           >
-            {timelineCategoryLabel(event.category)}
+            {CATEGORY_LABEL[event.category]}
           </span>
           <span className="flex items-center gap-1 text-sm text-text-muted">
             <span className="material-symbols-outlined text-[13px]">schedule</span>

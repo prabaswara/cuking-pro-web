@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { DocumentList } from "@/components/dokumen/document-list";
-import { getMockCat } from "@/lib/mock";
+import { getCat } from "@/lib/cats";
+import { listDocuments } from "@/lib/documents";
+import { getSession } from "@/lib/session";
 
 interface DokumenPageProps {
   params: Promise<{ id: string }>;
@@ -11,11 +13,21 @@ interface DokumenPageProps {
 export default async function DokumenPage({ params }: DokumenPageProps) {
   await connection();
   const { id } = await params;
-  const cat = getMockCat(id);
 
-  if (!cat) {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  let cat;
+  try {
+    cat = await getCat(session.user.id, id);
+  } catch {
     notFound();
   }
+
+  const { items, lockedCount, windowStart } = await listDocuments(
+    session.user.id,
+    id,
+  );
 
   return (
     <div className="space-y-6">
@@ -35,7 +47,14 @@ export default async function DokumenPage({ params }: DokumenPageProps) {
         </p>
       </div>
 
-      <DocumentList catId={id} catName={cat.name} />
+      <DocumentList
+        catId={id}
+        catName={cat.name}
+        initialDocuments={items}
+        lockedCount={lockedCount}
+        windowStart={windowStart}
+        frozen={cat.trackingStatus === "frozen"}
+      />
     </div>
   );
 }

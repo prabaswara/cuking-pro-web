@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { mockWeights } from "@/lib/mock";
+import type { WeightEntry } from "@/lib/health";
 
 const TIMEFRAMES = [
   { value: 30, label: "1 Bulan" },
@@ -11,21 +11,19 @@ const TIMEFRAMES = [
 ] as const;
 
 // Grafik SVG sederhana: peta tanggal → x, berat → y.
-export function WeightChart({ catId }: { catId: string }) {
+export function WeightChart({ weights }: { weights: WeightEntry[] }) {
   const [days, setDays] = useState<number>(90);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const points = useMemo(() => {
-    const all = mockWeights
-      .filter((w) => w.catId === catId)
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const all = [...weights].sort((a, b) => a.date.localeCompare(b.date));
     if (days === 0 || all.length === 0) return all;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
     const filtered = all.filter((w) => w.date >= cutoffStr);
     return filtered.length > 0 ? filtered : all;
-  }, [catId, days]);
+  }, [weights, days]);
 
   const W = 320;
   const H = 160;

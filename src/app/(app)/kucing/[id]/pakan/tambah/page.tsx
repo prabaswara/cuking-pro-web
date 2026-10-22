@@ -1,7 +1,8 @@
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { getMockCat } from "@/lib/mock";
+import { getCat } from "@/lib/cats";
+import { getSession } from "@/lib/session";
 import { PakanForm } from "./PakanForm";
 
 interface PakanPageProps {
@@ -11,9 +12,16 @@ interface PakanPageProps {
 export default async function PakanPage({ params }: PakanPageProps) {
   await connection();
   const { id } = await params;
-  const cat = getMockCat(id);
 
-  if (!cat) notFound();
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  let cat;
+  try {
+    cat = await getCat(session.user.id, id);
+  } catch {
+    notFound();
+  }
 
   return (
     <div className="space-y-6">
@@ -27,6 +35,12 @@ export default async function PakanPage({ params }: PakanPageProps) {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-on-surface">Catat Pakan</h1>
         <p className="mt-1 text-text-muted">Jadwal & porsi makan harian</p>
+        {cat.trackingStatus === "frozen" && (
+          <p className="mt-3 rounded-2xl bg-amber-subtle p-3 text-sm text-on-surface">
+            Kucing ini dibekukan karena batas paket Free. Upgrade ke Pro untuk
+            menambah jadwal pakan.
+          </p>
+        )}
       </div>
 
       <PakanForm catId={id} catName={cat.name} />

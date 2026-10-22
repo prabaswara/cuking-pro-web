@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { KesehatanList } from "@/components/kesehatan/kesehatan-list";
-import { getMockCat } from "@/lib/mock";
+import { getCat } from "@/lib/cats";
+import { listHealthRecords } from "@/lib/health";
+import { getSession } from "@/lib/session";
 
 interface KesehatanPageProps {
   params: Promise<{ id: string }>;
@@ -11,11 +13,21 @@ interface KesehatanPageProps {
 export default async function KesehatanPage({ params }: KesehatanPageProps) {
   await connection();
   const { id } = await params;
-  const cat = getMockCat(id);
 
-  if (!cat) {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  let cat;
+  try {
+    cat = await getCat(session.user.id, id);
+  } catch {
     notFound();
   }
+
+  const { items, lockedCount, windowStart } = await listHealthRecords(
+    session.user.id,
+    id,
+  );
 
   return (
     <div className="space-y-6">
@@ -35,7 +47,14 @@ export default async function KesehatanPage({ params }: KesehatanPageProps) {
         </p>
       </div>
 
-      <KesehatanList catId={id} />
+      <KesehatanList
+        catId={id}
+        catName={cat.name}
+        initialRecords={items}
+        lockedCount={lockedCount}
+        windowStart={windowStart}
+        frozen={cat.trackingStatus === "frozen"}
+      />
     </div>
   );
 }

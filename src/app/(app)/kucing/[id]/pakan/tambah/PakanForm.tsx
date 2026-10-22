@@ -32,10 +32,38 @@ export function PakanForm({ catId, catName }: PakanFormProps) {
     if (Object.keys(nextErrors).length) return;
 
     setIsLoading(true);
-    // TODO: POST /api/cats/:id/feeding-schedule
-    await new Promise(r => setTimeout(r, 800));
-    setIsLoading(false);
-    router.push(`/kucing/${catId}`);
+
+    try {
+      const response = await fetch(`/api/cats/${catId}/feeding`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleTime: schedule,
+          portionGrams: Number(portion),
+          foodType: foodType.trim(),
+          notes: notes.trim() || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const error = (data as { error?: { message?: string; field?: string } })?.error;
+        setErrors(
+          error?.field
+            ? { [error.field]: error.message ?? "Data tidak valid." }
+            : { form: error?.message ?? "Gagal menyimpan jadwal pakan." },
+        );
+        return;
+      }
+
+      router.push(`/kucing/${catId}`);
+      router.refresh();
+    } catch {
+      setErrors({ form: "Terjadi kesalahan. Silakan coba lagi." });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -98,6 +126,11 @@ export function PakanForm({ catId, catName }: PakanFormProps) {
           </div>
 
           <div className="flex flex-col gap-3 pt-2">
+            {errors.form && (
+              <p className="rounded-xl bg-error-container p-3 text-sm text-error">
+                {errors.form}
+              </p>
+            )}
             <Button type="submit" disabled={isLoading} className="h-14 w-full rounded-full text-base font-semibold">
               {isLoading ? "Menyimpan..." : `Simpan Jadwal untuk ${catName}`}
             </Button>
