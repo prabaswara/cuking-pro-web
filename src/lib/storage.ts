@@ -105,3 +105,120 @@ export const UPLOAD_LIMITS = {
   maxBytes: MAX_UPLOAD_BYTES,
   allowedMime: [...ALLOWED_MIME],
 } as const;
+
+// ============================================================
+// Dokumen (PDF / gambar) — brankas dokumen per kucing
+// ============================================================
+
+const DOCUMENT_DIR = path.join(process.cwd(), ".data", "documents");
+const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
+
+const DOCUMENT_MIME: Record<string, { ext: string; fileType: "pdf" | "image" }> = {
+  "application/pdf": { ext: "pdf", fileType: "pdf" },
+  "image/jpeg": { ext: "jpg", fileType: "image" },
+  "image/png": { ext: "png", fileType: "image" },
+  "image/webp": { ext: "webp", fileType: "image" },
+};
+
+export type StoredDocument = {
+  key: string;
+  contentType: string;
+  size: number;
+  fileType: "pdf" | "image";
+};
+
+function assertDocumentKey(key: string) {
+  if (!/^[a-f0-9-]+\.(pdf|jpg|png|webp)$/.test(key)) {
+    throw new ApiError("NOT_FOUND", "Berkas tidak ditemukan.");
+  }
+}
+
+/** Validasi dan simpan dokumen apa adanya (tanpa kompresi). */
+export async function saveStoredDocument(file: File): Promise<StoredDocument> {
+  if (!(file instanceof File) || file.size === 0) {
+    throw new ApiError("VALIDATION_ERROR", "Pilih berkas terlebih dahulu.", {
+      field: "file",
+    });
+  }
+
+  if (file.size > MAX_DOCUMENT_BYTES) {
+    throw new ApiError("VALIDATION_ERROR", "Ukuran dokumen maksimal 15 MB.", {
+      field: "file",
+    });
+  }
+
+  const mime = DOCUMENT_MIME[file.type];
+
+  if (!mime) {
+    throw new ApiError("VALIDATION_ERROR", "Format dokumen harus PDF, JPG, PNG, atau WebP.", {
+      field: "file",
+    });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Verifikasi isi berkas, bukan hanya MIME dari klien.
+  if (mime.fileType === "pdf") {
+    if (buffer.subarray(0, 5).toString("latin1") !== "%PDF-") {
+      throw new ApiError("VALIDATION_ERROR", "Berkas bukan PDF yang valid.", {
+        field: "file",
+      });
+    }
+  } else {
+    try {
+      const metadata = await sharp(buffer).metadata();
+      if (!metadata.format || !["jpeg", "png", "webp"].includes(metadata.format)) {
+        throw new Error("invalid image");
+      }
+    } catch {
+      throw new ApiError("VALIDATION_ERROR", "Berkas bukan gambar yang valid.", {
+        field: "file",
+      });
+    }
+  }
+
+  const key = `${randomUUID()}.${mime.ext}`;
+  await mkdir(DOCUMENT_DIR, { recursive: true });
+  await writeFile(path.join(DOCUMENT_DIR, key), buffer);
+
+  return { key, contentType: file.type, size: buffer.byteLength, fileType: mime.fileType };
+}
+
+export async function readStoredDocument(key: string) {
+  assertDocumentKey(key);
+
+  try {
+    const buffer = await readFile(path.join(DOCUMENT_DIR, key));
+    const ext = key.split(".").pop();
+    const contentType =
+      ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : ext === "jpg" ? "image/jpeg" : "image/webp";
+
+    return { buffer, contentType };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Terima key mentah atau path `/api/uploads/documents/<key>`.
+ * Path di luar penyimpanan dokumen diabaikan (tidak pernah menghapus
+ * berkas sembarangan).
+ */
+export async function deleteStoredDocument(keyOrPath: string) {
+  const prefix = "/api/uploads/documents/";
+  const key = keyOrPath.startsWith(prefix)
+    ? keyOrPath.slice(prefix.length)
+    : keyOrPath;
+
+  try {
+    assertDocumentKey(key);
+    await unlink(path.join(DOCUMENT_DIR, key));
+  } catch {
+    // Berkas sudah tidak ada — tidak perlu error.
+  }
+}
+
+export const DOCUMENT_LIMITS = {
+  maxBytes: MAX_DOCUMENT_BYTES,
+  allowedMime: Object.keys(DOCUMENT_MIME),
+} as const;
