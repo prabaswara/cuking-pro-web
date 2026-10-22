@@ -138,6 +138,47 @@ Format: **Tanggal — Keputusan** (alasan → dampak)
   handler), mencakup isolasi pemilik, kucing beku, sinkronisasi
   pengingat, jendela Free, dan validasi berat.
 
+## 2026-10-22 (Fase 3)
+- **Siklus birahi disimpan di tabel `heat_cycles`** (bukan catatan
+  kesehatan) → query per betina, validasi overlap, dan jarak antar siklus
+  menjadi sederhana; hanya betina aktif & dilacak yang boleh dicatat.
+- **Kawin menyimpan `owner_id`, betina/pejantan opsional (ID atau nama
+  manual)** → kucing luar tidak perlu didaftarkan sebagai `cats`; data
+  tetap owner-scoped lewat `matings.owner_id`.
+- **Estimasi lahir default +65 hari dan pengingat memakai
+  `source_type='pregnancy'` + `source_id=mating.id`** → perubahan manual
+  memperbarui pengingat yang sama, Tidak Hamil/kelahiran menghapusnya.
+- **Status `delivered` hanya dicapai lewat pencatatan kelahiran** →
+  mencegah catatan "sudah melahirkan" tanpa litter; validasi ini
+  ditolak di create/update biasa.
+- **Satu litter per catatan kawin lewat unique index `litters.mating_id`**
+  → duplikasi ditolak di level DB, bukan hanya pengecekan aplikasi.
+- **Anak kucing adalah baris `cats` dengan `litter_id`, `sire_id`,
+  `dam_id`, dan tanggal lahir litter** → otomatis muncul di daftar
+  kucing, silsilah, dan modul lain; foto bisa ditambahkan kemudian.
+- **Pendaftaran anak boleh sebagian tetapi tidak melebihi `total_alive`**,
+  dan tetap memanggil `assertCanAddCat` → batas kucing Free berlaku juga
+  untuk anak kucing.
+- **Penjualan memakai tabel `cat_sales` + partial unique index untuk
+  status aktif** → satu kucing tidak bisa punya dua penjualan
+  Dijual/Dipesan; status Terjual final dan koreksi lewat hapus.
+- **Terjual menandai pengingat aktif `done_at`, bukan menghapusnya** →
+  riwayat pengingat tetap utuh; kucing berubah `sold` dan hilang dari
+  daftar default. Hapus penjualan Terjual memulihkan kucing ke `active`.
+- **Jendela riwayat Free untuk kawin mengecualikan `pending`/`pregnant`**
+  → kehamilan yang belum melahirkan tetap terlihat walau tanggal kawin
+  lebih tua dari 3 bulan, sesuai PRD.
+- **Komponen mock breeding/penjualan lama dihapus** setelah halaman
+  memakai data DB → tidak ada dua sumber data yang membingungkan.
+- **Skema update dibuat dari field tanpa default** — pada Zod 4,
+  `.partial()` tetap menerapkan `.default()`, sehingga PATCH parsial bisa
+  mereset status/nilai (mis. hasil kawin menjadi `pending` atau
+  `depositPaid` menjadi `false`). Schema update memakai base field tanpa
+  default; ini juga memperbaiki PATCH dokumen dan berat Fase 2.
+- **Estimasi lahir boleh berada di masa depan** — validasi hanya
+  memastikan tidak sebelum tanggal kawin; larangan tanggal masa depan
+  berlaku untuk peristiwa yang sudah terjadi (kawin, lahir, jual, siklus).
+
 ## Template entri baru
 ```
 ## YYYY-MM-DD

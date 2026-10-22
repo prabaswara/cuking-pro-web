@@ -1,6 +1,8 @@
 # AI Context — cukingPro Web (update terakhir: 22 Okt 2026)
 
 ## Kondisi Saat Ini
+- **Backend Fase 3 SELESAI**: breeding (siklus birahi, kawin/kehamilan,
+  kelahiran, anak kucing) dan penjualan kucing sudah memakai data DB.
 - **Backend Fase 2 SELESAI**: kesehatan, berat, jadwal pakan, pengingat,
   dokumen, linimasa, jendela riwayat Free, dan halaman terkait.
 - **Backend Fase 1 SELESAI**: profil, paket (Free/Pro), kucing, silsilah,
@@ -11,7 +13,7 @@
 - **UI/UX Fase 1–6 SELESAI**; modul yang sudah punya API memakai data DB,
   sisanya masih `src/lib/mock.ts`.
 - Build produksi hijau (`npm run build`), `npx tsc --noEmit` bersih,
-  `npm run lint` **0 error**, `npm test` **45 lulus** (5 berkas).
+  `npm run lint` **0 error**, `npm test` **61 lulus** (7 berkas).
 - **Auth guard aktif**: `src/proxy.ts` (cookie → 307) + pengecekan sesi
   Better Auth di `(app)/layout.tsx`. Tidak ada lagi bypass demo.
 - **Akun demo** (`free@`, `breeder@`, `stud@`, `pro@demo.cukingpro`)
@@ -29,8 +31,9 @@
 - `src/db/schema.ts` — tabel auth Better Auth (`user`, `session`,
   `account`, `verification`) + `profiles`, `cats`, `cat_ownership_history`,
   `plans`, `subscriptions`, `health_records`, `reminders`,
-  `feeding_schedules`, `cat_documents`; migrasi di `drizzle/`
-  (`0001` Fase 1, `0002` Fase 2).
+  `feeding_schedules`, `cat_documents`, `heat_cycles`, `matings`,
+  `litters`, `cat_sales`; migrasi di `drizzle/`
+  (`0001` Fase 1, `0002` Fase 2, `0003` Fase 3).
 - `src/db/index.ts` — Drizzle + `postgres-js` (singleton saat dev).
 - `src/db/seed.ts` — 4 akun demo + kucing + plan Pro (idempoten).
 - `src/lib/auth.ts` — Better Auth + Drizzle adapter; verifikasi email
@@ -39,8 +42,11 @@
   paket (batas 2 kucing Free, jendela riwayat 3 bulan, rekonsiliasi beku).
 - `src/lib/{health,reminders,feeding,documents,timeline}.ts` — CRUD domain
   Fase 2, sinkronisasi pengingat otomatis, jendela riwayat, linimasa.
+- `src/lib/{heat-cycles,matings,litters,sales}.ts` — CRUD breeding &
+  penjualan Fase 3, sinkronisasi pengingat kehamilan, jendela riwayat,
+  aturan kelahiran dan alur status penjualan.
 - `src/lib/{date,labels}.ts` — helper tanggal kalender lokal & label UI.
-- `src/lib/validation/{cat,profile,health,reminder,feeding,document}.ts` —
+- `src/lib/validation/{cat,profile,health,reminder,feeding,document,breeding,sale}.ts` —
   skema Zod; route memvalidasi ulang.
 - `src/lib/storage.ts` — simpan/kompres foto (sharp → WebP) dan dokumen
   (PDF/gambar) di `.data/`; antarmuka siap diganti S3/R2.
@@ -49,9 +55,11 @@
 - `src/app/api/profile/route.ts` — GET/PATCH profil.
 - `src/app/api/plan/route.ts` — paket + pemakaian + jendela riwayat.
 - `src/app/api/cats/**` — CRUD, tracking, pedigree, health, weights,
-  feeding, documents.
-- `src/app/api/{health,weights,reminders,feeding,documents}/[id]` —
+  feeding, documents, heat-cycles.
+- `src/app/api/{health,weights,reminders,feeding,documents,heat-cycles}/[id]` —
   PATCH/DELETE per entri.
+- `src/app/api/{matings,litters,cat-sales}/**` — kawin/kehamilan,
+  kelahiran + anak kucing, penjualan.
 - `src/app/api/reminders/route.ts` — GET/POST pengingat manual.
 - `src/app/api/uploads/**` — POST/GET foto & dokumen (sesi wajib).
 - `src/lib/session.ts` — `getSession()`, `requireSession()` (memanggil
@@ -61,8 +69,8 @@
 - `src/proxy.ts` — cek cookie sesi → redirect 307 ke `/login`.
 - Env: `.env.example` (lengkap), `.env` lokal gitignored; `.env.test`
   untuk database tes.
-- Tes: `tests/{plan,cats,health,reminders,records}.test.ts` (unit +
-  integrasi PostgreSQL).
+- Tes: `tests/{plan,cats,health,reminders,records,breeding,sales}.test.ts`
+  (unit + integrasi PostgreSQL).
 
 ## Fitur per Halaman (sudah jadi)
 - `/` landing (+tautan legal); auth: `/login` (pemilih akun demo),
@@ -71,9 +79,11 @@
 - `/dashboard` — statistik kucing + pengingat 7 hari dari DB, aksi cepat
   memakai kucing aktif pertama
 - `/kucing` & `/kucing/tambah` — **data DB**; detail/edit/silsilah/jual
-  memakai DB kecuali modul yang masih mock
+  memakai DB
 - `/kucing/[id]` — **ringkasan DB**: berat terakhir, catatan kesehatan,
-  jadwal pakan
+  jadwal pakan; aksi Jual hanya untuk breeder
+- `/kucing/[id]/jual` — **form penjualan DB** (mengarah ke edit bila
+  sudah ada penjualan aktif)
 - `/kucing/[id]/kesehatan` (+tambah), `/berat`, `/dokumen`, `/timeline`,
   `/pakan/tambah` — **data DB**
 - `/profil` — **profil & peran dari DB**
@@ -82,7 +92,7 @@
 - `/pengingat` — **daftar/tambah/selesai/tunda/hapus dari DB**
 - `/breeding` (tab Siklus Birahi / Kawin & Kehamilan / Penjualan),
   `/breeding/kehamilan/[id]` + `/lahir`, `/breeding/litter/[id]`
-  + `/tambah-anak`, `/penjualan/[id]/edit` — mock
+  + `/tambah-anak`, `/penjualan/[id]/edit` — **data DB**
 - `/jasa-pacak` (tab Pejantan / Booking), `/jasa-pacak/booking/[id]` — mock
 - `/transfer`, `/riwayat-kepemilikan`, `/keuangan` — mock
 - PWA: manifest + icon/apple-icon dari logoset (`public/brand/`)
@@ -100,9 +110,19 @@
 - **Backend Fase 2**: berat disimpan di `health_records` (`type='weight'`)
   sesuai PRD; `/weights` hanya permukaan khusus. Pengingat otomatis
   memakai `source_type='health'` + `source_id` unik agar tidak duplikat.
+- **Backend Fase 3**: breeding memakai tabel `heat_cycles`, `matings`,
+  `litters`; anak kucing adalah baris `cats` dengan `litter_id`. Satu
+  litter per kawin (unique) dan status `delivered` hanya lewat pencatatan
+  kelahiran. Pengingat kehamilan memakai `source_type='pregnancy'` +
+  `source_id=mating.id`.
+- **Penjualan Fase 3**: tabel `cat_sales` dengan partial unique index
+  untuk satu penjualan aktif per kucing; status Terjual final, mengubah
+  kucing menjadi `sold`, dan menandai pengingat aktif selesai (bukan
+  dihapus). Hapus penjualan Terjual memulihkan kucing ke `active`.
 - **Jendela riwayat Free** dihitung dari hari ini (3 bulan kalender) dan
-  diterapkan di daftar kesehatan/berat/dokumen; respons menyertakan
-  `lockedCount` + `windowStart` untuk banner UI.
+  diterapkan di daftar kesehatan/berat/dokumen/birahi/kawin/penjualan;
+  respons menyertakan `lockedCount` + `windowStart` untuk banner UI.
+  Kehamilan `pending`/`pregnant` tetap tampil walau lebih tua.
 - **Dokumen tidak diklaim terverifikasi**: `verified` selalu `false` dari
   API; UI menampilkan "Akses privat" / "Belum diverifikasi".
 - **Akun demo = user Better Auth hasil seed**, bukan endpoint palsu;
@@ -121,14 +141,14 @@
 
 ## Batasan / Yang Perlu Diketahui Agent Berikutnya
 - Sudah ada: Better Auth, Drizzle/DB, migrasi, seed demo, API profil/plan/
-  kucing/uploads/kesehatan/berat/pakan/pengingat/dokumen, auth guard,
-  tes Vitest.
-- Belum ada: API breeding/penjualan/jasa pacak/transfer/keuangan,
-  cron job, Midtrans, SMTP nyata.
+  kucing/uploads/kesehatan/berat/pakan/pengingat/dokumen/breeding/penjualan,
+  auth guard, tes Vitest.
+- Belum ada: API jasa pacak/transfer/keuangan, cron job, Midtrans, SMTP nyata.
 - Tabel `feeding_schedules` & `cat_documents` adalah pendukung UI dan
   belum tercantum eksplisit di PRD.
-- `cats.litter_id` & `cat_ownership_history.transfer_id` ditunda sampai
-  tabel Fase 3/5 dibuat.
+- `cat_ownership_history.transfer_id` ditunda sampai Fase 5.
+- Foto anak kucing belum diunggah dari form tambah anak; masih bisa
+  diubah dari halaman detail kucing setelah terdaftar.
 - Upload avatar profil belum disambungkan (tombol disabled).
 - Harga/durasi Pro masih placeholder (`plans` di seed).
 - Data mock memakai tanggal relatif hari ini (fungsi `d(n)` di mock.ts)
