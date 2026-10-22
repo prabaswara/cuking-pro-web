@@ -259,9 +259,71 @@ export async function syncPregnancyReminder(
   });
 }
 
+/** Pengingat jadwal pacak saat booking disetujui (FR-12). */
+export async function syncBookingPlannedReminder(
+  executor: DbExecutor,
+  params: {
+    userId: string;
+    bookingId: string;
+    title: string;
+    dueDate: string | null;
+  },
+): Promise<void> {
+  await syncSourcedReminder(executor, "booking_planned", {
+    userId: params.userId,
+    catId: null,
+    sourceId: params.bookingId,
+    title: params.title,
+    dueDate: params.dueDate,
+  });
+}
+
+/** Pengingat estimasi lahir betina klien setelah kawin pertama (FR-13). */
+export async function syncBookingDueReminder(
+  executor: DbExecutor,
+  params: {
+    userId: string;
+    bookingId: string;
+    title: string;
+    dueDate: string | null;
+    reopen?: boolean;
+  },
+): Promise<void> {
+  await syncSourcedReminder(
+    executor,
+    "booking_due",
+    {
+      userId: params.userId,
+      catId: null,
+      sourceId: params.bookingId,
+      title: params.title,
+      dueDate: params.dueDate,
+    },
+    { reopen: params.reopen ?? false },
+  );
+}
+
+/** Tutup pengingat estimasi lahir tanpa menghapus riwayatnya. */
+export async function completeBookingDueReminder(
+  executor: DbExecutor,
+  params: { userId: string; bookingId: string },
+): Promise<void> {
+  await executor
+    .update(reminders)
+    .set({ doneAt: new Date() })
+    .where(
+      and(
+        eq(reminders.userId, params.userId),
+        eq(reminders.sourceType, "booking_due"),
+        eq(reminders.sourceId, params.bookingId),
+        isNull(reminders.doneAt),
+      ),
+    );
+}
+
 async function syncSourcedReminder(
   executor: DbExecutor,
-  sourceType: "health" | "pregnancy",
+  sourceType: "health" | "pregnancy" | "booking_planned" | "booking_due",
   params: {
     userId: string;
     catId: string | null;
@@ -269,6 +331,7 @@ async function syncSourcedReminder(
     title: string;
     dueDate: string | null;
   },
+  options: { reopen?: boolean } = {},
 ): Promise<void> {
   const [existing] = await executor
     .select()
@@ -298,7 +361,9 @@ async function syncSourcedReminder(
         catId: params.catId,
         title: params.title,
         dueDate: params.dueDate,
-        ...(changed ? { doneAt: null, notifiedH3At: null, notifiedD0At: null } : {}),
+        ...(changed || options.reopen
+          ? { doneAt: null, notifiedH3At: null, notifiedD0At: null }
+          : {}),
       })
       .where(eq(reminders.id, existing.id));
     return;
