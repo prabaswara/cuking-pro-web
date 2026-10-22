@@ -1,31 +1,19 @@
-"use client";
-
-import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { StudServiceList } from "@/components/pacak/stud-service-list";
-import { StudBookingList } from "@/components/pacak/stud-booking-list";
+import { redirect } from "next/navigation";
+import { StudTabs } from "@/components/pacak/stud-tabs";
+import { listCats } from "@/lib/cats";
+import { getOrCreateProfile } from "@/lib/profile";
+import { getSession } from "@/lib/session";
+import { getStudOverview } from "@/lib/stud-bookings";
 
-const subscribe = () => () => {};
+export default async function JasaPacakPage() {
+  const session = await getSession();
+  if (!session) redirect("/login");
 
-function readFlag(key: string): string {
-  if (typeof window === "undefined") return "false";
-  try {
-    return localStorage.getItem(key) === "true" ? "true" : "false";
-  } catch {
-    return "false";
-  }
-}
+  const userId = session.user.id;
+  const profile = await getOrCreateProfile(userId);
 
-export default function JasaPacakPage() {
-  const [activeTab, setActiveTab] = useState<"pejantan" | "booking">("booking");
-  const isStudProvider =
-    useSyncExternalStore(
-      subscribe,
-      () => readFlag("cukingpro:isStudProvider"),
-      () => "false",
-    ) === "true";
-
-  if (!isStudProvider) {
+  if (!profile.isStudProvider) {
     return (
       <div className="space-y-6">
         <div>
@@ -37,14 +25,21 @@ export default function JasaPacakPage() {
 
         <div className="rounded-3xl border-sand-border bg-surface-card p-8 text-center shadow-warm-sm">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-lavender-subtle">
-            <span className="material-symbols-outlined text-3xl text-tertiary">cruelty_free</span>
+            <span className="material-symbols-outlined text-3xl text-tertiary">
+              cruelty_free
+            </span>
           </div>
-          <h2 className="text-xl font-bold text-on-surface">Fitur Jasa Pacak Tersembunyi</h2>
-          <p className="mt-2 max-w-md mx-auto text-text-muted">
-            Aktifkan peran &ldquo;Saya Menyediakan Jasa Pacak&rdquo; di <Link href="/profil" className="text-primary underline">Profil</Link>
+          <h2 className="text-xl font-bold text-on-surface">
+            Fitur Jasa Pacak Tersembunyi
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-text-muted">
+            Aktifkan peran &ldquo;Saya Menyediakan Jasa Pacak&rdquo; di{" "}
+            <Link href="/profil" className="text-primary underline">
+              Profil
+            </Link>{" "}
             untuk mengakses fitur manajemen pejantan pacak dan booking klien.
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex items-center justify-center">
             <Link href="/profil">
               <span className="inline-flex h-12 items-center rounded-full bg-primary px-6 font-semibold text-primary-foreground">
                 Buka Profil
@@ -56,40 +51,31 @@ export default function JasaPacakPage() {
     );
   }
 
+  const [overview, cats] = await Promise.all([
+    getStudOverview(userId),
+    listCats(userId, { status: "all" }),
+  ]);
+
+  const eligibleCats = cats
+    .filter(
+      (cat) =>
+        cat.sex === "male" &&
+        cat.status === "active" &&
+        cat.trackingStatus === "tracked",
+    )
+    .map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      breed: cat.breed,
+      color: cat.color,
+      photoPath: cat.photoPath,
+    }));
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-on-surface">Jasa Pacak</h1>
-        <p className="mt-1 text-text-muted">
-          Kelola pejantan pacak dan booking klien
-        </p>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setActiveTab("pejantan")}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-            activeTab === "pejantan"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "bg-surface-card text-text-muted shadow-sm"
-          }`}
-        >
-          Pejantan Pacak
-        </button>
-        <button
-          onClick={() => setActiveTab("booking")}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-            activeTab === "booking"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "bg-surface-card text-text-muted shadow-sm"
-          }`}
-        >
-          Booking
-        </button>
-      </div>
-
-      {activeTab === "pejantan" && <StudServiceList />}
-      {activeTab === "booking" && <StudBookingList />}
-    </div>
+    <StudTabs
+      services={overview.services}
+      cats={eligibleCats}
+      bookings={overview.bookings}
+    />
   );
 }
