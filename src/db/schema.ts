@@ -163,7 +163,10 @@ export const cats = pgTable(
       onDelete: "set null",
     }),
     damNameManual: text("dam_name_manual"),
-    // `litter_id` ditambahkan pada Fase 3 bersama tabel `litters`.
+    // Diisi saat anak kucing didaftarkan dari sebuah litter (Fase 3).
+    litterId: uuid("litter_id").references((): AnyPgColumn => litters.id, {
+      onDelete: "set null",
+    }),
     status: text("status", { enum: ["active", "sold", "deceased"] })
       .default("active")
       .notNull(),
@@ -309,6 +312,114 @@ export const catDocuments = pgTable(
 );
 
 // ============================================================
+// Fase 3 — breeding & penjualan
+// ============================================================
+
+/** Siklus birahi betina (FR-08). */
+export const heatCycles = pgTable(
+  "heat_cycles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catId: uuid("cat_id")
+      .notNull()
+      .references(() => cats.id, { onDelete: "cascade" }),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("heat_cycles_cat_id_idx").on(table.catId),
+    index("heat_cycles_start_date_idx").on(table.startDate),
+  ],
+);
+
+/** Catatan kawin & kehamilan kucing milik breeder (FR-09). */
+export const matings = pgTable(
+  "matings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    queenId: uuid("queen_id").references(() => cats.id, { onDelete: "set null" }),
+    queenNameManual: text("queen_name_manual"),
+    sireId: uuid("sire_id").references(() => cats.id, { onDelete: "set null" }),
+    sireNameManual: text("sire_name_manual"),
+    matingDate: date("mating_date").notNull(),
+    outcome: text("outcome", {
+      enum: ["pending", "pregnant", "not_pregnant", "delivered"],
+    })
+      .default("pending")
+      .notNull(),
+    expectedDueDate: date("expected_due_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("matings_owner_id_idx").on(table.ownerId),
+    index("matings_mating_date_idx").on(table.matingDate),
+    index("matings_outcome_idx").on(table.outcome),
+  ],
+);
+
+/** Kelahiran; satu catatan kawin hanya boleh punya satu litter (FR-10). */
+export const litters = pgTable(
+  "litters",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    matingId: uuid("mating_id")
+      .notNull()
+      .references(() => matings.id, { onDelete: "cascade" }),
+    birthDate: date("birth_date").notNull(),
+    totalBorn: integer("total_born").notNull(),
+    totalAlive: integer("total_alive").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("litters_mating_id_uidx").on(table.matingId),
+    index("litters_birth_date_idx").on(table.birthDate),
+  ],
+);
+
+/** Penjualan kucing oleh breeder (FR-19). */
+export const catSales = pgTable(
+  "cat_sales",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    catId: uuid("cat_id").references(() => cats.id, { onDelete: "set null" }),
+    catName: text("cat_name").notNull(),
+    status: text("status", {
+      enum: ["listed", "reserved", "sold", "cancelled"],
+    })
+      .default("listed")
+      .notNull(),
+    askingPrice: integer("asking_price"),
+    buyerName: text("buyer_name"),
+    buyerWhatsapp: text("buyer_whatsapp"),
+    finalPrice: integer("final_price"),
+    depositAmount: integer("deposit_amount"),
+    depositPaid: boolean("deposit_paid").default(false).notNull(),
+    saleDate: date("sale_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("cat_sales_owner_id_idx").on(table.ownerId),
+    index("cat_sales_status_idx").on(table.status),
+    index("cat_sales_sale_date_idx").on(table.saleDate),
+    // Satu penjualan aktif (dijual/dipesan) per kucing.
+    uniqueIndex("cat_sales_active_cat_uidx")
+      .on(table.catId)
+      .where(sql`${table.status} in ('listed', 'reserved')`),
+  ],
+);
+
+// ============================================================
 // Relasi
 // ============================================================
 
@@ -318,6 +429,8 @@ export const userRelations = relations(user, ({ many, one }) => ({
   cats: many(cats),
   subscriptions: many(subscriptions),
   reminders: many(reminders),
+  matings: many(matings),
+  catSales: many(catSales),
   profile: one(profiles, {
     fields: [user.id],
     references: [profiles.userId],
@@ -380,6 +493,14 @@ export const catsRelations = relations(cats, ({ one, many }) => ({
   reminders: many(reminders),
   feedingSchedules: many(feedingSchedules),
   documents: many(catDocuments),
+  heatCycles: many(heatCycles),
+  litter: one(litters, {
+    fields: [cats.litterId],
+    references: [litters.id],
+  }),
+  queenMatings: many(matings, { relationName: "mating_queen" }),
+  sireMatings: many(matings, { relationName: "mating_sire" }),
+  sales: many(catSales),
 }));
 
 export const catOwnershipHistoryRelations = relations(
@@ -424,6 +545,53 @@ export const feedingSchedulesRelations = relations(feedingSchedules, ({ one }) =
 export const catDocumentsRelations = relations(catDocuments, ({ one }) => ({
   cat: one(cats, {
     fields: [catDocuments.catId],
+    references: [cats.id],
+  }),
+}));
+
+export const heatCyclesRelations = relations(heatCycles, ({ one }) => ({
+  cat: one(cats, {
+    fields: [heatCycles.catId],
+    references: [cats.id],
+  }),
+}));
+
+export const matingsRelations = relations(matings, ({ one }) => ({
+  owner: one(user, {
+    fields: [matings.ownerId],
+    references: [user.id],
+  }),
+  queen: one(cats, {
+    fields: [matings.queenId],
+    references: [cats.id],
+    relationName: "mating_queen",
+  }),
+  sire: one(cats, {
+    fields: [matings.sireId],
+    references: [cats.id],
+    relationName: "mating_sire",
+  }),
+  litter: one(litters, {
+    fields: [matings.id],
+    references: [litters.matingId],
+  }),
+}));
+
+export const littersRelations = relations(litters, ({ one, many }) => ({
+  mating: one(matings, {
+    fields: [litters.matingId],
+    references: [matings.id],
+  }),
+  kittens: many(cats),
+}));
+
+export const catSalesRelations = relations(catSales, ({ one }) => ({
+  owner: one(user, {
+    fields: [catSales.ownerId],
+    references: [user.id],
+  }),
+  cat: one(cats, {
+    fields: [catSales.catId],
     references: [cats.id],
   }),
 }));
