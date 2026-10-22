@@ -23,6 +23,15 @@ export function addDaysIso(dateStr: string, days: number): string {
   return todayIso(date);
 }
 
+/** Selisih hari antara dua tanggal (YYYY-MM-DD); positif bila `to` lebih akhir. */
+export function daysBetweenIso(from: string, to: string): number {
+  return Math.round(
+    (new Date(`${to}T00:00:00`).getTime() -
+      new Date(`${from}T00:00:00`).getTime()) /
+      86_400_000,
+  );
+}
+
 /** Selisih hari dari hari ini ke tanggal (negatif = sudah lewat). */
 export function daysUntil(dateStr: string, now = new Date()): number {
   const target = new Date(`${dateStr}T00:00:00`);

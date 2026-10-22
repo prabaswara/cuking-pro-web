@@ -230,19 +230,59 @@ export async function syncHealthReminder(
     nextDueDate: string | null;
   },
 ): Promise<void> {
+  await syncSourcedReminder(executor, "health", {
+    userId: params.userId,
+    catId: params.catId,
+    sourceId: params.healthRecordId,
+    title: params.title,
+    dueDate: params.nextDueDate,
+  });
+}
+
+/** Pengingat estimasi lahir dari catatan kawin (FR-09). */
+export async function syncPregnancyReminder(
+  executor: DbExecutor,
+  params: {
+    userId: string;
+    catId: string | null;
+    matingId: string;
+    title: string;
+    dueDate: string | null;
+  },
+): Promise<void> {
+  await syncSourcedReminder(executor, "pregnancy", {
+    userId: params.userId,
+    catId: params.catId,
+    sourceId: params.matingId,
+    title: params.title,
+    dueDate: params.dueDate,
+  });
+}
+
+async function syncSourcedReminder(
+  executor: DbExecutor,
+  sourceType: "health" | "pregnancy",
+  params: {
+    userId: string;
+    catId: string | null;
+    sourceId: string;
+    title: string;
+    dueDate: string | null;
+  },
+): Promise<void> {
   const [existing] = await executor
     .select()
     .from(reminders)
     .where(
       and(
         eq(reminders.userId, params.userId),
-        eq(reminders.sourceType, "health"),
-        eq(reminders.sourceId, params.healthRecordId),
+        eq(reminders.sourceType, sourceType),
+        eq(reminders.sourceId, params.sourceId),
       ),
     )
     .limit(1);
 
-  if (!params.nextDueDate) {
+  if (!params.dueDate) {
     if (existing) {
       await executor.delete(reminders).where(eq(reminders.id, existing.id));
     }
@@ -250,14 +290,14 @@ export async function syncHealthReminder(
   }
 
   if (existing) {
-    const changed = existing.dueDate !== params.nextDueDate;
+    const changed = existing.dueDate !== params.dueDate;
 
     await executor
       .update(reminders)
       .set({
         catId: params.catId,
         title: params.title,
-        dueDate: params.nextDueDate,
+        dueDate: params.dueDate,
         ...(changed ? { doneAt: null, notifiedH3At: null, notifiedD0At: null } : {}),
       })
       .where(eq(reminders.id, existing.id));
@@ -268,8 +308,8 @@ export async function syncHealthReminder(
     userId: params.userId,
     catId: params.catId,
     title: params.title,
-    dueDate: params.nextDueDate,
-    sourceType: "health",
-    sourceId: params.healthRecordId,
+    dueDate: params.dueDate,
+    sourceType,
+    sourceId: params.sourceId,
   });
 }
