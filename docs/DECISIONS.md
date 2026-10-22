@@ -179,6 +179,38 @@ Format: **Tanggal — Keputusan** (alasan → dampak)
   memastikan tidak sebelum tanggal kawin; larangan tanggal masa depan
   berlaku untuk peristiwa yang sudah terjadi (kawin, lahir, jual, siklus).
 
+## 2026-10-22 (Fase 4)
+- **Memakai tabel PRD `stud_services`, `stud_bookings`, dan
+  `stud_booking_matings`** → mengikuti skema resmi, dengan tambahan
+  `approved_at` untuk mengetahui apakah booking pernah disetujui.
+- **`stud_services.cat_id` nullable + unique dan tetap menyimpan
+  `cat_name`** → saat kucing ditransfer (Fase 5), layanan bisa
+  dikosongkan tanpa kehilangan nama; layanan otomatis tidak bisa
+  dibooking karena `cat_id` kosong.
+- **Menghapus profil pejantan yang sudah punya booking ditolak** →
+  riwayat klien tidak ikut terhapus; pengguna cukup menonaktifkan
+  ketersediaan. FK `stud_service_id` memakai `RESTRICT`.
+- **Booking baru selalu `requested`; status `ongoing` hanya lewat kawin
+  pertama** → mencegah “Berlangsung” tanpa catatan kawin. `completed`
+  hanya dari `ongoing` dan minimal satu kawin.
+- **Hapus kawin terakhir memakai `approved_at` untuk memilih status
+  kembalian** → kembali ke Disetujui bila pernah disetujui, atau
+  Diminta bila belum; estimasi lahir dikosongkan dan pengingat dihapus.
+- **Pengingat booking memakai `source_type='booking_planned'` dan
+  `'booking_due'` + `source_id=booking.id`** → satu booking punya
+  maksimal satu pengingat jadwal dan satu pengingat lahir; disetujui
+  dengan tanggal membuat jadwal, kawin pertama membuat estimasi.
+- **Tidak hamil menghapus pengingat, sudah melahirkan menutup
+  (`done_at`)** → riwayat pengingat tetap ada saat melahirkan, sesuai
+  semantik “menutup” di PRD.
+- **Bentrok jadwal hanya peringatan** → UI memeriksa booking aktif
+  dengan pejantan + tanggal yang sama, lalu meminta konfirmasi “Tetap
+  Simpan”; server tidak memblokir.
+- **Estimasi lahir manual dipertahankan saat tanggal kawin berubah** →
+  pengguna bisa mengembalikan ke hitungan otomatis lewat aksi khusus.
+- **Statistik pejantan dihitung dari booking yang terlihat sesuai
+  paket** → akun Free tidak menghitung booking lama yang terkunci.
+
 ## Template entri baru
 ```
 ## YYYY-MM-DD

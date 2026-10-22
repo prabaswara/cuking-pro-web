@@ -1,6 +1,8 @@
 # AI Context — cukingPro Web (update terakhir: 22 Okt 2026)
 
 ## Kondisi Saat Ini
+- **Backend Fase 4 SELESAI**: profil pejantan pacak, booking, catatan
+  kawin, pengingat booking, statistik, dan UI Jasa Pacak sudah DB.
 - **Backend Fase 3 SELESAI**: breeding (siklus birahi, kawin/kehamilan,
   kelahiran, anak kucing) dan penjualan kucing sudah memakai data DB.
 - **Backend Fase 2 SELESAI**: kesehatan, berat, jadwal pakan, pengingat,
@@ -13,7 +15,7 @@
 - **UI/UX Fase 1–6 SELESAI**; modul yang sudah punya API memakai data DB,
   sisanya masih `src/lib/mock.ts`.
 - Build produksi hijau (`npm run build`), `npx tsc --noEmit` bersih,
-  `npm run lint` **0 error**, `npm test` **61 lulus** (7 berkas).
+  `npm run lint` **0 error**, `npm test` **72 lulus** (8 berkas).
 - **Auth guard aktif**: `src/proxy.ts` (cookie → 307) + pengecekan sesi
   Better Auth di `(app)/layout.tsx`. Tidak ada lagi bypass demo.
 - **Akun demo** (`free@`, `breeder@`, `stud@`, `pro@demo.cukingpro`)
@@ -32,8 +34,9 @@
   `account`, `verification`) + `profiles`, `cats`, `cat_ownership_history`,
   `plans`, `subscriptions`, `health_records`, `reminders`,
   `feeding_schedules`, `cat_documents`, `heat_cycles`, `matings`,
-  `litters`, `cat_sales`; migrasi di `drizzle/`
-  (`0001` Fase 1, `0002` Fase 2, `0003` Fase 3).
+  `litters`, `cat_sales`, `stud_services`, `stud_bookings`,
+  `stud_booking_matings`; migrasi di `drizzle/`
+  (`0001` Fase 1, `0002` Fase 2, `0003` Fase 3, `0004` Fase 4).
 - `src/db/index.ts` — Drizzle + `postgres-js` (singleton saat dev).
 - `src/db/seed.ts` — 4 akun demo + kucing + plan Pro (idempoten).
 - `src/lib/auth.ts` — Better Auth + Drizzle adapter; verifikasi email
@@ -45,8 +48,11 @@
 - `src/lib/{heat-cycles,matings,litters,sales}.ts` — CRUD breeding &
   penjualan Fase 3, sinkronisasi pengingat kehamilan, jendela riwayat,
   aturan kelahiran dan alur status penjualan.
+- `src/lib/{stud-services,stud-bookings}.ts` — profil pejantan pacak,
+  booking, catatan kawin, transisi status, bentrok jadwal, statistik,
+  pengingat jadwal/estimasi lahir, dan jendela riwayat Free.
 - `src/lib/{date,labels}.ts` — helper tanggal kalender lokal & label UI.
-- `src/lib/validation/{cat,profile,health,reminder,feeding,document,breeding,sale}.ts` —
+- `src/lib/validation/{cat,profile,health,reminder,feeding,document,breeding,sale,stud}.ts` —
   skema Zod; route memvalidasi ulang.
 - `src/lib/storage.ts` — simpan/kompres foto (sharp → WebP) dan dokumen
   (PDF/gambar) di `.data/`; antarmuka siap diganti S3/R2.
@@ -60,6 +66,8 @@
   PATCH/DELETE per entri.
 - `src/app/api/{matings,litters,cat-sales}/**` — kawin/kehamilan,
   kelahiran + anak kucing, penjualan.
+- `src/app/api/{stud-services,stud-bookings,booking-matings}/**` —
+  pejantan pacak, booking klien, catatan kawin, statistik.
 - `src/app/api/reminders/route.ts` — GET/POST pengingat manual.
 - `src/app/api/uploads/**` — POST/GET foto & dokumen (sesi wajib).
 - `src/lib/session.ts` — `getSession()`, `requireSession()` (memanggil
@@ -69,7 +77,7 @@
 - `src/proxy.ts` — cek cookie sesi → redirect 307 ke `/login`.
 - Env: `.env.example` (lengkap), `.env` lokal gitignored; `.env.test`
   untuk database tes.
-- Tes: `tests/{plan,cats,health,reminders,records,breeding,sales}.test.ts`
+- Tes: `tests/{plan,cats,health,reminders,records,breeding,sales,stud}.test.ts`
   (unit + integrasi PostgreSQL).
 
 ## Fitur per Halaman (sudah jadi)
@@ -93,7 +101,8 @@
 - `/breeding` (tab Siklus Birahi / Kawin & Kehamilan / Penjualan),
   `/breeding/kehamilan/[id]` + `/lahir`, `/breeding/litter/[id]`
   + `/tambah-anak`, `/penjualan/[id]/edit` — **data DB**
-- `/jasa-pacak` (tab Pejantan / Booking), `/jasa-pacak/booking/[id]` — mock
+- `/jasa-pacak` (tab Pejantan / Booking),
+  `/jasa-pacak/booking/[id]` — **data DB**
 - `/transfer`, `/riwayat-kepemilikan`, `/keuangan` — mock
 - PWA: manifest + icon/apple-icon dari logoset (`public/brand/`)
 
@@ -120,9 +129,27 @@
   kucing menjadi `sold`, dan menandai pengingat aktif selesai (bukan
   dihapus). Hapus penjualan Terjual memulihkan kucing ke `active`.
 - **Jendela riwayat Free** dihitung dari hari ini (3 bulan kalender) dan
-  diterapkan di daftar kesehatan/berat/dokumen/birahi/kawin/penjualan;
-  respons menyertakan `lockedCount` + `windowStart` untuk banner UI.
-  Kehamilan `pending`/`pregnant` tetap tampil walau lebih tua.
+  diterapkan di daftar kesehatan/berat/dokumen/birahi/kawin/penjualan/
+  booking pacak; respons menyertakan `lockedCount` + `windowStart` untuk
+  banner UI. Kehamilan `pending`/`pregnant` dan booking aktif tetap
+  tampil walau lebih tua.
+- **Fase 4 memakai tabel PRD `stud_services`, `stud_bookings`, dan
+  `stud_booking_matings`.** Tambahan `approved_at` menyimpan apakah
+  booking pernah disetujui, sehingga hapus kawin terakhir bisa kembali
+  ke Disetujui atau Diminta dengan tepat.
+- **Pengingat booking memakai `source_type='booking_planned'` /
+  `'booking_due'` + `source_id=booking.id`.** Booking disetujui dengan
+  tanggal rencana membuat pengingat jadwal; kawin pertama membuat
+  pengingat estimasi lahir (65 hari). Tidak hamil menghapus, sudah
+  melahirkan menutup (`done_at`).
+- **Bentrok jadwal hanya peringatan, bukan larangan.** UI memeriksa
+  booking aktif dengan pejantan + tanggal yang sama lalu meminta
+  konfirmasi “Tetap Simpan”; server tetap mengizinkan penyimpanan.
+- **Profil pejantan tidak boleh dihapus bila sudah punya booking** →
+  nonaktifkan ketersediaan agar riwayat tetap utuh; FK memakai restrict.
+- **Estimasi lahir manual dipertahankan** saat kawin pertama berubah;
+  pengguna bisa memilih “Hitung Otomatis (Kawin + 65 Hari)” untuk
+  mengembalikan mode otomatis.
 - **Dokumen tidak diklaim terverifikasi**: `verified` selalu `false` dari
   API; UI menampilkan "Akses privat" / "Belum diverifikasi".
 - **Akun demo = user Better Auth hasil seed**, bukan endpoint palsu;
@@ -141,9 +168,10 @@
 
 ## Batasan / Yang Perlu Diketahui Agent Berikutnya
 - Sudah ada: Better Auth, Drizzle/DB, migrasi, seed demo, API profil/plan/
-  kucing/uploads/kesehatan/berat/pakan/pengingat/dokumen/breeding/penjualan,
-  auth guard, tes Vitest.
-- Belum ada: API jasa pacak/transfer/keuangan, cron job, Midtrans, SMTP nyata.
+  kucing/uploads/kesehatan/berat/pakan/pengingat/dokumen/breeding/
+  penjualan/jasa-pacak, auth guard, tes Vitest.
+- Belum ada: API transfer/keuangan, halaman publik pejantan (FR-19),
+  cron job, Midtrans, SMTP nyata.
 - Tabel `feeding_schedules` & `cat_documents` adalah pendukung UI dan
   belum tercantum eksplisit di PRD.
 - `cat_ownership_history.transfer_id` ditunda sampai Fase 5.
