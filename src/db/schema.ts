@@ -420,6 +420,99 @@ export const catSales = pgTable(
 );
 
 // ============================================================
+// Fase 4 — jasa pacak
+// ============================================================
+
+/** Profil pejantan yang ditawarkan untuk jasa pacak (FR-11). */
+export const studServices = pgTable(
+  "stud_services",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catId: uuid("cat_id").references(() => cats.id, { onDelete: "set null" }),
+    catName: text("cat_name").notNull(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    feeAmount: integer("fee_amount"),
+    feeDescription: text("fee_description"),
+    notes: text("notes"),
+    isAvailable: boolean("is_available").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("stud_services_owner_id_idx").on(table.ownerId),
+    // Satu profil pacak per kucing; null diperbolehkan setelah transfer.
+    uniqueIndex("stud_services_cat_id_uidx").on(table.catId),
+  ],
+);
+
+/** Booking klien jasa pacak (FR-12, FR-13). */
+export const studBookings = pgTable(
+  "stud_bookings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    studServiceId: uuid("stud_service_id")
+      .notNull()
+      .references(() => studServices.id, { onDelete: "restrict" }),
+    clientName: text("client_name").notNull(),
+    clientWhatsapp: text("client_whatsapp").notNull(),
+    queenName: text("queen_name").notNull(),
+    queenBreed: text("queen_breed"),
+    queenAgeText: text("queen_age_text"),
+    plannedDate: date("planned_date"),
+    status: text("status", {
+      enum: ["requested", "approved", "ongoing", "completed", "rejected", "cancelled"],
+    })
+      .default("requested")
+      .notNull(),
+    feeAgreed: integer("fee_agreed"),
+    depositAmount: integer("deposit_amount"),
+    depositPaid: boolean("deposit_paid").default(false).notNull(),
+    expectedDueDate: date("expected_due_date"),
+    expectedDueDateManual: boolean("expected_due_date_manual")
+      .default(false)
+      .notNull(),
+    queenPregnancyStatus: text("queen_pregnancy_status", {
+      enum: ["unknown", "pregnant", "not_pregnant", "delivered"],
+    })
+      .default("unknown")
+      .notNull(),
+    notes: text("notes"),
+    // Dipakai untuk tahu apakah pembatalan kawin kembali ke Disetujui
+    // atau Diminta (PRD FR-13).
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("stud_bookings_owner_id_idx").on(table.ownerId),
+    index("stud_bookings_stud_service_id_idx").on(table.studServiceId),
+    index("stud_bookings_status_idx").on(table.status),
+    index("stud_bookings_planned_date_idx").on(table.plannedDate),
+  ],
+);
+
+/** Catatan kawin per booking pacak (FR-13). */
+export const studBookingMatings = pgTable(
+  "stud_booking_matings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => studBookings.id, { onDelete: "cascade" }),
+    matingDate: date("mating_date").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("stud_booking_matings_booking_id_idx").on(table.bookingId),
+    index("stud_booking_matings_mating_date_idx").on(table.matingDate),
+  ],
+);
+
+// ============================================================
 // Relasi
 // ============================================================
 
@@ -431,6 +524,8 @@ export const userRelations = relations(user, ({ many, one }) => ({
   reminders: many(reminders),
   matings: many(matings),
   catSales: many(catSales),
+  studServices: many(studServices),
+  studBookings: many(studBookings),
   profile: one(profiles, {
     fields: [user.id],
     references: [profiles.userId],
@@ -501,6 +596,10 @@ export const catsRelations = relations(cats, ({ one, many }) => ({
   queenMatings: many(matings, { relationName: "mating_queen" }),
   sireMatings: many(matings, { relationName: "mating_sire" }),
   sales: many(catSales),
+  studService: one(studServices, {
+    fields: [cats.id],
+    references: [studServices.catId],
+  }),
 }));
 
 export const catOwnershipHistoryRelations = relations(
@@ -595,3 +694,37 @@ export const catSalesRelations = relations(catSales, ({ one }) => ({
     references: [cats.id],
   }),
 }));
+
+export const studServicesRelations = relations(studServices, ({ one, many }) => ({
+  owner: one(user, {
+    fields: [studServices.ownerId],
+    references: [user.id],
+  }),
+  cat: one(cats, {
+    fields: [studServices.catId],
+    references: [cats.id],
+  }),
+  bookings: many(studBookings),
+}));
+
+export const studBookingsRelations = relations(studBookings, ({ one, many }) => ({
+  owner: one(user, {
+    fields: [studBookings.ownerId],
+    references: [user.id],
+  }),
+  service: one(studServices, {
+    fields: [studBookings.studServiceId],
+    references: [studServices.id],
+  }),
+  matings: many(studBookingMatings),
+}));
+
+export const studBookingMatingsRelations = relations(
+  studBookingMatings,
+  ({ one }) => ({
+    booking: one(studBookings, {
+      fields: [studBookingMatings.bookingId],
+      references: [studBookings.id],
+    }),
+  }),
+);
