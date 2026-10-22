@@ -113,21 +113,29 @@ export const healthListQuerySchema = z.object({
 });
 
 /** Payload khusus halaman Berat (dipetakan ke health_records type='weight'). */
-export const weightCreateSchema = z.object({
-  recordDate: isoDate.default(todayIso()),
+const weightFields = {
+  recordDate: isoDate,
   weightKg: z
     .number()
     .positive("Berat badan harus lebih dari 0 kg")
     .max(20, "Berat badan maksimal 20 kg"),
   notes: optionalText(2000),
+};
+
+export const weightCreateSchema = z.object({
+  ...weightFields,
+  recordDate: isoDate.default(todayIso()),
 });
 
-export const weightUpdateSchema = weightCreateSchema.partial().superRefine((data, ctx) => {
-  if (Object.keys(data).length === 0) {
-    ctx.addIssue({ code: "custom", message: "Tidak ada data yang diubah" });
-  }
-  issueFutureDate(data, ctx);
-});
+export const weightUpdateSchema = z
+  .object(weightFields)
+  .partial()
+  .superRefine((data, ctx) => {
+    if (Object.keys(data).length === 0) {
+      ctx.addIssue({ code: "custom", message: "Tidak ada data yang diubah" });
+    }
+    issueFutureDate(data, ctx);
+  });
 
 export type HealthCreateInput = z.infer<typeof healthCreateSchema>;
 export type HealthUpdateInput = z.infer<typeof healthUpdateSchema>;

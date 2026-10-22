@@ -21,8 +21,9 @@ import {
 import { createHealthRecord, createWeight } from "@/lib/health";
 import { historyWindowStart } from "@/lib/plan";
 import { getCatTimeline } from "@/lib/timeline";
-import { documentCreateSchema } from "@/lib/validation/document";
+import { documentCreateSchema, documentUpdateSchema } from "@/lib/validation/document";
 import { feedingCreateSchema } from "@/lib/validation/feeding";
+import { weightUpdateSchema } from "@/lib/validation/health";
 
 /**
  * Tes integrasi jadwal pakan, brankas dokumen, dan linimasa gabungan.
@@ -249,6 +250,15 @@ describe("brankas dokumen", () => {
     expect(
       documentCreateSchema.safeParse({ ...base, title: " " }).success,
     ).toBe(false);
+  });
+
+  it("update parsial tidak mengisi nilai default create", () => {
+    expect(documentUpdateSchema.parse({ title: "Baru" })).toEqual({
+      title: "Baru",
+    });
+    expect(weightUpdateSchema.parse({ notes: "Catatan" })).toEqual({
+      notes: "Catatan",
+    });
   });
 });
 
